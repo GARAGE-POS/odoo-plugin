@@ -1,0 +1,23 @@
+{
+  "name": "Odoo DevContainer",
+  "dockerComposeFile": "docker-compose.yaml",
+  "service": "odoo",
+  "workspaceFolder": "/mnt/extra-addons",
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/mnt/extra-addons,type=bind,consistency=cached"
+  ],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.pythonPath": "/usr/bin/python3"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  },
+  "containerUser": "odoo",
+  "remoteUser": "odoo",
+  "postCreateCommand": "pip3 install -r /usr/lib/python3/dist-packages/odoo/requirements.txt || true"
+}
