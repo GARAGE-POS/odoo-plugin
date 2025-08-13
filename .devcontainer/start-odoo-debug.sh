@@ -5,6 +5,8 @@ echo "You can attach your debugger to localhost:5678 after Odoo starts"
 
 # Kill any process listening on port 5678 to avoid orphaned debugpy processes
 fuser -k 5678/tcp || true
+fuser -k 8069/tcp || true
+
 
 # Start Odoo with debugpy for remote debugging (without waiting for client)
 exec /usr/bin/python3 -m debugpy --listen 0.0.0.0:5678 -m odoo --addons-path=/mnt/extra-addons

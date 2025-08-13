@@ -34,25 +34,18 @@
                 "focus": false,
                 "panel": "new"
             },
-            "problemMatcher": [
-                {
-                    "pattern": [
-                        {
-                            "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
-                            "file": 1,
-                            "line": 2,
-                            "column": 3,
-                            "severity": 4,
-                            "message": 5
-                        }
-                    ],
-                    "background": {
-                        "activeOnStart": true,
-                        "beginsPattern": "^Starting Odoo with debugpy on port 5678",
-                        "endsPattern": "You can attach your debugger to localhost:5678 after Odoo starts"
-                    }
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^(.*)$",
+                    "file": 1,
+                    "message": 1
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^Starting Odoo with debugpy on port 5678",
+                    "endsPattern": "You can attach your debugger to localhost:5678 after Odoo starts"
                 }
-            ],
+            },
             "isBackground": true
         },
         {
@@ -103,22 +96,6 @@
             },
             "problemMatcher": [],
             "isBackground": true
-        },
-        {
-            "label": "Ensure Odoo Debug Running",
-            "type": "shell",
-            "command": "/mnt/extra-addons/.devcontainer/ensure-debug-ready.sh",
-            "group": {
-                "kind": "build",
-                "isDefault": false
-            },
-            "presentation": {
-                "echo": true,
-                "reveal": "silent",
-                "focus": false,
-                "panel": "shared"
-            },
-            "problemMatcher": []
         }
     ]
 }
