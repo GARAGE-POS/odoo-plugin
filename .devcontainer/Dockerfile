@@ -18,6 +18,7 @@ ARG GROUP_ID=1000
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive \
     apt-get install -y --no-install-recommends \
+        git \
         ca-certificates \
         curl \
         dirmngr \
@@ -41,7 +42,12 @@ RUN apt-get update && \
         python3-watchdog \
         python3-xlrd \
         python3-xlwt \
-        xz-utils && \
+        xz-utils \
+        pipx \
+        python3-venv \
+        python3-full \
+        # Add any other dependencies you need here
+        && \
     if [ -z "${TARGETARCH}" ]; then \
         TARGETARCH="$(dpkg --print-architecture)"; \
     fi; \

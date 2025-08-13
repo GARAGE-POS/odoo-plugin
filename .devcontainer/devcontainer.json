@@ -19,5 +19,5 @@
   },
   "containerUser": "odoo",
   "remoteUser": "odoo",
-  "postCreateCommand": "pip3 install -r /usr/lib/python3/dist-packages/odoo/requirements.txt || true"
+  "postAttachCommand": "bash /mnt/extra-addons/.devcontainer/activate.sh"
 }

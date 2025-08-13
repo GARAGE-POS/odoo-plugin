@@ -31,6 +31,12 @@ check_config "db_port" "$PORT"
 check_config "db_user" "$USER"
 check_config "db_password" "$PASSWORD"
 
+# Ensure pipx path is set and cookiecutter is installed
+pipx ensurepath
+if ! pipx list | grep -q cookiecutter; then
+    pipx install cookiecutter
+fi
+
 case "$1" in
     -- | odoo)
         shift
