@@ -2,15 +2,15 @@
 
 set -e
 
-# Fix ownership of mounted extra-addons directory
+echo "[entrypoint] Fixing ownership of /mnt/extra-addons..."
 sudo chown -R odoo:odoo /mnt/extra-addons 2>/dev/null || true
 
 if [ -v PASSWORD_FILE ]; then
+    echo "[entrypoint] Reading password from file..."
     PASSWORD="$(< $PASSWORD_FILE)"
 fi
 
-# set the postgres database host, port, user and password according to the environment
-# and pass them as arguments to the odoo process if not present in the config file
+echo "[entrypoint] Setting database connection variables..."
 : ${HOST:=${DB_PORT_5432_TCP_ADDR:='db'}}
 : ${PORT:=${DB_PORT_5432_TCP_PORT:=5432}}
 : ${USER:=${DB_ENV_POSTGRES_USER:=${POSTGRES_USER:='odoo'}}}
@@ -31,28 +31,31 @@ check_config "db_port" "$PORT"
 check_config "db_user" "$USER"
 check_config "db_password" "$PASSWORD"
 
-# Ensure pipx path is set and cookiecutter is installed
-pipx ensurepath
-if ! pipx list | grep -q cookiecutter; then
-    pipx install cookiecutter
-fi
-
+echo "[entrypoint] Entrypoint arguments: $@"
 case "$1" in
     -- | odoo)
         shift
         if [[ "$1" == "scaffold" ]] ; then
+            echo "[entrypoint] Running odoo scaffold..."
             exec odoo "$@"
         else
+            echo "[entrypoint] Waiting for PostgreSQL..."
             wait-for-psql.py ${DB_ARGS[@]} --timeout=30
+            echo "[entrypoint] Starting odoo..."
             exec odoo "$@" "${DB_ARGS[@]}"
         fi
         ;;
     -*)
+        echo "[entrypoint] Waiting for PostgreSQL..."
         wait-for-psql.py ${DB_ARGS[@]} --timeout=30
+        echo "[entrypoint] Starting odoo with arguments..."
         exec odoo "$@" "${DB_ARGS[@]}"
         ;;
     *)
+        echo "[entrypoint] Executing custom command: $@"
         exec "$@"
 esac
+
+/usr/bin/python3 -m pip install --break-system-packages --no-cache-dir debugpy
 
 exit 1

@@ -4,9 +4,121 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "logs",
+            "label": "Start Odoo (Normal)",
             "type": "shell",
-            "command": "tail -f /var/log/odoo/odoo.log"
+            "command": "/mnt/extra-addons/.devcontainer/start-odoo.sh",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "new"
+            },
+            "problemMatcher": [],
+            "isBackground": true
+        },
+        {
+            "label": "Start Odoo (Debug)",
+            "type": "shell",
+            "command": "/mnt/extra-addons/.devcontainer/start-odoo-debug.sh",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "new"
+            },
+            "problemMatcher": [
+                {
+                    "pattern": [
+                        {
+                            "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                            "file": 1,
+                            "line": 2,
+                            "column": 3,
+                            "severity": 4,
+                            "message": 5
+                        }
+                    ],
+                    "background": {
+                        "activeOnStart": true,
+                        "beginsPattern": "^Starting Odoo with debugpy on port 5678",
+                        "endsPattern": "You can attach your debugger to localhost:5678 after Odoo starts"
+                    }
+                }
+            ],
+            "isBackground": true
+        },
+        {
+            "label": "Update Karage Module",
+            "type": "shell",
+            "command": "odoo --addons-path=/mnt/extra-addons --update=karage-pos --stop-after-init",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "new"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Install Karage Module",
+            "type": "shell",
+            "command": "odoo --addons-path=/mnt/extra-addons --init=karage-pos --stop-after-init",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "new"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "View Odoo Logs",
+            "type": "shell",
+            "command": "tail -f /var/log/odoo/odoo.log",
+            "group": {
+                "kind": "test",
+                "isDefault": false
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "new"
+            },
+            "problemMatcher": [],
+            "isBackground": true
+        },
+        {
+            "label": "Ensure Odoo Debug Running",
+            "type": "shell",
+            "command": "/mnt/extra-addons/.devcontainer/ensure-debug-ready.sh",
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
         }
     ]
 }

@@ -22,6 +22,7 @@ services:
       - db
     ports:
       - "8069:8069"
+      - "5678:5678"  # debugpy port
     volumes:
       - odoo-filestore:/var/lib/odoo
       - ../addons:/mnt/extra-addons

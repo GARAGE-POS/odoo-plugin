@@ -18,6 +18,5 @@
     }
   },
   "containerUser": "odoo",
-  "remoteUser": "odoo",
-  "postAttachCommand": "bash /mnt/extra-addons/.devcontainer/activate.sh"
+  "remoteUser": "odoo"
 }
