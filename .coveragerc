@@ -1,0 +1,16 @@
+[run]
+source = karage-pos
+omit = 
+    */tests/*
+    */__pycache__/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+
+[html]
+directory = htmlcov
+title = Karage POS Module Coverage Report

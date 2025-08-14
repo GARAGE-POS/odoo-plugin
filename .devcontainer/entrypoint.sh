@@ -56,6 +56,6 @@ case "$1" in
         exec "$@"
 esac
 
-/usr/bin/python3 -m pip install --break-system-packages --no-cache-dir debugpy
+/usr/bin/python3 -m pip install --break-system-packages --no-cache-dir debugpy coverage
 
 exit 1
