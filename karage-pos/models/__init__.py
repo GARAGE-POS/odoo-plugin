@@ -1,1 +1,1 @@
-from . import request_log
+from . import logger
