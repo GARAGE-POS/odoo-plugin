@@ -14,16 +14,16 @@
             </field>
         </record>
 
-        <!-- POS Order Tree View for Karage -->
+        <!-- Extend POS Order Tree View to add Karage fields -->
         <record id="view_pos_order_tree_karage" model="ir.ui.view">
             <field name="name">pos.order.tree.karage</field>
             <field name="model">pos.order</field>
             <field name="inherit_id" ref="point_of_sale.view_pos_order_tree"/>
             <field name="arch" type="xml">
-                <xpath expr="//field[@name='name']" position="after">
-                    <field name="karage_order_id" string="Karage ID"/>
-                    <field name="karage_location_id" string="Location"/>
-                </xpath>
+                <field name="name" position="after">
+                    <field name="karage_order_id" string="Karage ID" optional="hide"/>
+                    <field name="karage_location_id" string="Location" optional="hide"/>
+                </field>
             </field>
         </record>
 

@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Karage POS Monitoring Dashboard Menu -->
+        <menuitem id="menu_karage_monitoring" 
+                  name="Karage Monitoring" 
+                  parent="menu_karage_pos_root" 
+                  sequence="10"/>
+
+        <!-- Request Logger Views for Monitoring -->
+        <record id="view_karage_request_logger_tree" model="ir.ui.view">
+            <field name="name">karage.request.logger.tree</field>
+            <field name="model">karage.request.logger</field>
+            <field name="arch" type="xml">
+                <list string="API Request Logs" 
+                      default_order="timestamp desc">
+                    <field name="timestamp" string="Timestamp"/>
+                    <field name="url" string="Endpoint"/>
+                    <field name="body" string="Request Body" widget="text"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_karage_request_logger_form" model="ir.ui.view">
+            <field name="name">karage.request.logger.form</field>
+            <field name="model">karage.request.logger</field>
+            <field name="arch" type="xml">
+                <form string="API Request Log Details">
+                    <sheet>
+                        <group>
+                            <field name="timestamp" string="Timestamp"/>
+                            <field name="url" string="API Endpoint"/>
+                        </group>
+                        <notebook>
+                            <page string="Request Headers" name="headers">
+                                <field name="headers" widget="text"/>
+                            </page>
+                            <page string="Request Body (JSON)" name="body">
+                                <field name="body" widget="text" height="300"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_karage_request_logger_search" model="ir.ui.view">
+            <field name="name">karage.request.logger.search</field>
+            <field name="model">karage.request.logger</field>
+            <field name="arch" type="xml">
+                <search string="Search API Requests">
+                    <field name="url" string="Endpoint"/>
+                    <filter name="today" string="Today" 
+                            domain="[('timestamp', '&gt;=', datetime.datetime.combine(context_today(), datetime.time(0,0,0))), 
+                                     ('timestamp', '&lt;', datetime.datetime.combine(context_today() + datetime.timedelta(days=1), datetime.time(0,0,0)))]"/>
+                    <filter name="this_week" string="This Week" 
+                            domain="[('timestamp', '&gt;=', (context_today() - datetime.timedelta(days=context_today().weekday())).strftime('%Y-%m-%d'))]"/>
+                    <group expand="0" string="Group By">
+                        <filter string="Date" name="group_date" 
+                                domain="[]" context="{'group_by': 'timestamp:day'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_karage_request_logger" model="ir.actions.act_window">
+            <field name="name">API Request Logs</field>
+            <field name="res_model">karage.request.logger</field>
+            <field name="view_mode">tree,form</field>
+            <field name="search_view_id" ref="view_karage_request_logger_search"/>
+            <field name="context">{'search_default_today': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No API requests logged yet!
+                </p>
+                <p>
+                    All incoming requests to the Karage POS API will be logged here
+                    for monitoring and debugging purposes.
+                </p>
+            </field>
+        </record>
+
+        <menuitem id="menu_karage_request_logs" 
+                  name="API Request Logs" 
+                  parent="menu_karage_monitoring"
+                  action="action_karage_request_logger" 
+                  sequence="10"/>
+
+        <!-- Enhanced POS Order Monitoring View -->
+        <record id="view_pos_order_karage_tree" model="ir.ui.view">
+            <field name="name">pos.order.karage.tree</field>
+            <field name="model">pos.order</field>
+            <field name="arch" type="xml">
+                <list string="Karage POS Orders" 
+                      default_order="date_order desc"
+                      decoration-success="state == 'paid'"
+                      decoration-warning="state == 'draft'"
+                      decoration-danger="state == 'cancel'">
+                    <field name="name" string="Order #"/>
+                    <field name="date_order" string="Order Date"/>
+                    <field name="karage_location_id" string="Karage Location"/>
+                    <field name="partner_id" string="Customer"/>
+                    <field name="karage_order_id" string="Karage Order ID"/>
+                    <field name="amount_total" string="Total Amount" sum="Total"/>
+                    <field name="amount_paid" string="Paid Amount" sum="Paid"/>
+                    <field name="state" string="Status"/>
+                    <field name="account_move" string="Invoice" 
+                           widget="badge" 
+                           decoration-success="account_move"
+                           decoration-muted="not account_move"/>
+                    <field name="session_id" string="Session"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Custom form view removed to avoid field validation issues -->
+        <!-- Using standard POS order form view with tree view extensions -->
+
+        <record id="view_pos_order_karage_search" model="ir.ui.view">
+            <field name="name">pos.order.karage.search</field>
+            <field name="model">pos.order</field>
+            <field name="arch" type="xml">
+                <search string="Search Karage POS Orders">
+                    <field name="name" string="Order Number"/>
+                    <field name="partner_id" string="Customer"/>
+                    <field name="karage_location_id" string="Karage Location"/>
+                    <field name="karage_order_id" string="Karage Order ID"/>
+                    <filter name="karage_orders" string="Karage Orders Only" 
+                            domain="[('karage_location_id', '!=', False)]"/>
+                    <filter name="today_orders" string="Today's Orders" 
+                            domain="[('date_order', '&gt;=', datetime.datetime.combine(context_today(), datetime.time(0,0,0))), 
+                                     ('date_order', '&lt;', datetime.datetime.combine(context_today() + datetime.timedelta(days=1), datetime.time(0,0,0)))]"/>
+                    <filter name="paid_orders" string="Paid Orders" 
+                            domain="[('state', '=', 'paid')]"/>
+                    <filter name="with_invoice" string="With Invoice" 
+                            domain="[('account_move', '!=', False)]"/>
+                    <group expand="0" string="Group By">
+                        <filter string="Location" name="group_location" 
+                                domain="[]" context="{'group_by': 'karage_location_id'}"/>
+                        <filter string="Customer" name="group_customer" 
+                                domain="[]" context="{'group_by': 'partner_id'}"/>
+                        <filter string="Date" name="group_date" 
+                                domain="[]" context="{'group_by': 'date_order:day'}"/>
+                        <filter string="Status" name="group_status" 
+                                domain="[]" context="{'group_by': 'state'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_pos_order_karage" model="ir.actions.act_window">
+            <field name="name">Karage POS Orders</field>
+            <field name="res_model">pos.order</field>
+            <field name="view_mode">list,form</field>
+            <field name="view_id" ref="view_pos_order_karage_tree"/>
+            <field name="search_view_id" ref="view_pos_order_karage_search"/>
+            <field name="context">{'search_default_karage_orders': 1, 'search_default_today_orders': 1}</field>
+            <field name="domain">[('karage_location_id', '!=', False)]</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No Karage POS orders yet!
+                </p>
+                <p>
+                    Orders processed from Karage POS systems will appear here
+                    with full details including payment and inventory impact.
+                </p>
+            </field>
+        </record>
+
+        <menuitem id="menu_karage_pos_orders" 
+                  name="POS Orders" 
+                  parent="menu_karage_monitoring"
+                  action="action_pos_order_karage" 
+                  sequence="20"/>
+
+        <!-- Inventory Impact Monitoring -->
+        <record id="view_stock_quant_karage_tree" model="ir.ui.view">
+            <field name="name">stock.quant.karage.tree</field>
+            <field name="model">stock.quant</field>
+            <field name="arch" type="xml">
+                <list string="Karage Product Inventory"
+                      decoration-warning="quantity &lt; 5"
+                      decoration-danger="quantity &lt;= 0">
+                    <field name="product_id" string="Product"/>
+                    <field name="location_id" string="Location"/>
+                    <field name="quantity" string="On Hand"/>
+                    <field name="available_quantity" string="Available"/>
+                    <field name="product_uom_id" string="Unit"/>
+                    <field name="inventory_date" string="Last Inventory"/>
+                    <field name="accounting_date" string="Accounting Date"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="action_stock_quant_karage" model="ir.actions.act_window">
+            <field name="name">Karage Product Inventory</field>
+            <field name="res_model">stock.quant</field>
+            <field name="view_mode">tree</field>
+            <field name="domain">[('product_id.default_code', '=like', '1703%')]</field>
+            <field name="context">{'search_default_internal_loc': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No Karage products found!
+                </p>
+                <p>
+                    Inventory levels for all Karage POS products will be shown here.
+                    Products with low stock will be highlighted.
+                </p>
+            </field>
+        </record>
+
+        <menuitem id="menu_karage_inventory" 
+                  name="Product Inventory" 
+                  parent="menu_karage_monitoring"
+                  action="action_stock_quant_karage" 
+                  sequence="30"/>
+
+        <!-- Accounting Integration Monitoring -->
+        <record id="view_account_move_karage_tree" model="ir.ui.view">
+            <field name="name">account.move.karage.tree</field>
+            <field name="model">account.move</field>
+            <field name="arch" type="xml">
+                <list string="Karage POS Invoices"
+                      decoration-success="state == 'posted'"
+                      decoration-warning="state == 'draft'"
+                      decoration-danger="state == 'cancel'">
+                    <field name="name" string="Invoice #"/>
+                    <field name="invoice_date" string="Invoice Date"/>
+                    <field name="partner_id" string="Customer"/>
+                    <field name="amount_untaxed" string="Untaxed Amount"/>
+                    <field name="amount_tax" string="Tax"/>
+                    <field name="amount_total" string="Total Amount"/>
+                    <field name="state" string="Status"/>
+                    <field name="payment_state" string="Payment Status"/>
+                    <field name="pos_order_ids" string="POS Orders" widget="many2many_tags"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="action_account_move_karage" model="ir.actions.act_window">
+            <field name="name">Karage POS Invoices</field>
+            <field name="res_model">account.move</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[('pos_order_ids', '!=', False), ('pos_order_ids.karage_location_id', '!=', False)]</field>
+            <field name="context">{}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No Karage POS invoices yet!
+                </p>
+                <p>
+                    Invoices generated from Karage POS orders will appear here
+                    with complete accounting integration.
+                </p>
+            </field>
+        </record>
+
+        <menuitem id="menu_karage_invoices" 
+                  name="Generated Invoices" 
+                  parent="menu_karage_monitoring"
+                  action="action_account_move_karage" 
+                  sequence="40"/>
+
+    </data>
+</odoo>

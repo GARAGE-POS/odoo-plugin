@@ -13,6 +13,18 @@ class PosPayment(models.Model):
         string='Karage Card Data',
         help='Additional card information from Karage POS'
     )
+    card_type = fields.Char(
+        string='Card Type',
+        help='Type of card used for payment (Cash, Credit, Debit, etc.)'
+    )
+    cardholder_name = fields.Char(
+        string='Cardholder Name',
+        help='Name of the cardholder'
+    )
+    transaction_id = fields.Char(
+        string='Transaction ID',
+        help='Transaction or card number reference'
+    )
 
     @api.model
     def create_from_karage_data(self, pos_order, payment_detail):

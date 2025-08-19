@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <!-- Demo products with inventory for testing Karage POS integration -->
+        
+        <!-- Product Categories for better organization -->
+        <record id="product_category_automotive_oil" model="product.category">
+            <field name="name">Automotive Oil</field>
+            <field name="parent_id" ref="product_category_karage"/>
+        </record>
+        
+        <record id="product_category_automotive_filters" model="product.category">
+            <field name="name">Automotive Filters</field>
+            <field name="parent_id" ref="product_category_karage"/>
+        </record>
+        
+        <record id="product_category_automotive_parts" model="product.category">
+            <field name="name">Automotive Parts</field>
+            <field name="parent_id" ref="product_category_karage"/>
+        </record>
+        
+        <record id="product_category_automotive_tires" model="product.category">
+            <field name="name">Automotive Tires</field>
+            <field name="parent_id" ref="product_category_karage"/>
+        </record>
+
+        <!-- Demo Product 1: Fuchs Oil 5W30 -->
+        <record id="product_fuchs_oil_5w30" model="product.product">
+            <field name="name">Fuchs Oil 5W30 Syn SN</field>
+            <field name="default_code">170388</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="categ_id" ref="product_category_automotive_oil"/>
+            <field name="list_price">25.00</field>
+            <field name="standard_price">20.00</field>
+            <field name="available_in_pos">True</field>
+            <field name="sale_ok">True</field>
+            <field name="purchase_ok">True</field>
+        </record>
+
+        <!-- Demo Product 2: Mobil 1 0W20 -->
+        <record id="product_mobil_0w20" model="product.product">
+            <field name="name">Mobil 1 0W20 Full Synthetic</field>
+            <field name="default_code">170389</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="categ_id" ref="product_category_automotive_oil"/>
+            <field name="list_price">30.00</field>
+            <field name="standard_price">24.00</field>
+            <field name="available_in_pos">True</field>
+            <field name="sale_ok">True</field>
+            <field name="purchase_ok">True</field>
+        </record>
+
+        <!-- Demo Product 3: Castrol GTX 10W40 -->
+        <record id="product_castrol_10w40" model="product.product">
+            <field name="name">Castrol GTX 10W40</field>
+            <field name="default_code">170390</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="categ_id" ref="product_category_automotive_oil"/>
+            <field name="list_price">22.00</field>
+            <field name="standard_price">18.00</field>
+            <field name="available_in_pos">True</field>
+            <field name="sale_ok">True</field>
+            <field name="purchase_ok">True</field>
+        </record>
+
+        <!-- Demo Product 4: Bosch Oil Filter -->
+        <record id="product_bosch_oil_filter" model="product.product">
+            <field name="name">Bosch Oil Filter</field>
+            <field name="default_code">170391</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="categ_id" ref="product_category_automotive_filters"/>
+            <field name="list_price">15.00</field>
+            <field name="standard_price">12.00</field>
+            <field name="available_in_pos">True</field>
+            <field name="sale_ok">True</field>
+            <field name="purchase_ok">True</field>
+        </record>
+
+        <!-- Demo Product 5: Mann Air Filter -->
+        <record id="product_mann_air_filter" model="product.product">
+            <field name="name">Mann Air Filter</field>
+            <field name="default_code">170392</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="categ_id" ref="product_category_automotive_filters"/>
+            <field name="list_price">18.00</field>
+            <field name="standard_price">14.00</field>
+            <field name="available_in_pos">True</field>
+            <field name="sale_ok">True</field>
+            <field name="purchase_ok">True</field>
+        </record>
+
+        <!-- Demo Product 6: NGK Spark Plug -->
+        <record id="product_ngk_spark_plug" model="product.product">
+            <field name="name">NGK Spark Plug</field>
+            <field name="default_code">170393</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="categ_id" ref="product_category_automotive_parts"/>
+            <field name="list_price">8.00</field>
+            <field name="standard_price">6.00</field>
+            <field name="available_in_pos">True</field>
+            <field name="sale_ok">True</field>
+            <field name="purchase_ok">True</field>
+        </record>
+
+        <!-- Demo Product 7: Denso Spark Plug -->
+        <record id="product_denso_spark_plug" model="product.product">
+            <field name="name">Denso Spark Plug</field>
+            <field name="default_code">170394</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="categ_id" ref="product_category_automotive_parts"/>
+            <field name="list_price">10.00</field>
+            <field name="standard_price">7.50</field>
+            <field name="available_in_pos">True</field>
+            <field name="sale_ok">True</field>
+            <field name="purchase_ok">True</field>
+        </record>
+
+        <!-- Demo Product 8: Brembo Brake Pads -->
+        <record id="product_brembo_brake_pads" model="product.product">
+            <field name="name">Brembo Brake Pads</field>
+            <field name="default_code">170395</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="categ_id" ref="product_category_automotive_parts"/>
+            <field name="list_price">45.00</field>
+            <field name="standard_price">35.00</field>
+            <field name="available_in_pos">True</field>
+            <field name="sale_ok">True</field>
+            <field name="purchase_ok">True</field>
+        </record>
+
+        <!-- Demo Product 9: Michelin Tire 195/65R15 -->
+        <record id="product_michelin_tire_195" model="product.product">
+            <field name="name">Michelin Tire 195/65R15</field>
+            <field name="default_code">170396</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="categ_id" ref="product_category_automotive_tires"/>
+            <field name="list_price">85.00</field>
+            <field name="standard_price">65.00</field>
+            <field name="available_in_pos">True</field>
+            <field name="sale_ok">True</field>
+            <field name="purchase_ok">True</field>
+        </record>
+
+        <!-- Demo Product 10: Continental Tire 205/55R16 -->
+        <record id="product_continental_tire_205" model="product.product">
+            <field name="name">Continental Tire 205/55R16</field>
+            <field name="default_code">170397</field>
+            <field name="type">consu</field>
+            <field name="is_storable">True</field>
+            <field name="categ_id" ref="product_category_automotive_tires"/>
+            <field name="list_price">95.00</field>
+            <field name="standard_price">75.00</field>
+            <field name="available_in_pos">True</field>
+            <field name="sale_ok">True</field>
+            <field name="purchase_ok">True</field>
+        </record>
+
+        <!-- Initial Stock for Demo Products - each product gets 10 units -->
+        <record id="stock_quant_fuchs_oil" model="stock.quant">
+            <field name="product_id" ref="product_fuchs_oil_5w30"/>
+            <field name="location_id" ref="stock_location_karage_main"/>
+            <field name="quantity">10.0</field>
+        </record>
+
+        <record id="stock_quant_mobil_oil" model="stock.quant">
+            <field name="product_id" ref="product_mobil_0w20"/>
+            <field name="location_id" ref="stock_location_karage_main"/>
+            <field name="quantity">10.0</field>
+        </record>
+
+        <record id="stock_quant_castrol_oil" model="stock.quant">
+            <field name="product_id" ref="product_castrol_10w40"/>
+            <field name="location_id" ref="stock_location_karage_main"/>
+            <field name="quantity">10.0</field>
+        </record>
+
+        <record id="stock_quant_bosch_filter" model="stock.quant">
+            <field name="product_id" ref="product_bosch_oil_filter"/>
+            <field name="location_id" ref="stock_location_karage_main"/>
+            <field name="quantity">10.0</field>
+        </record>
+
+        <record id="stock_quant_mann_filter" model="stock.quant">
+            <field name="product_id" ref="product_mann_air_filter"/>
+            <field name="location_id" ref="stock_location_karage_main"/>
+            <field name="quantity">10.0</field>
+        </record>
+
+        <record id="stock_quant_ngk_plug" model="stock.quant">
+            <field name="product_id" ref="product_ngk_spark_plug"/>
+            <field name="location_id" ref="stock_location_karage_main"/>
+            <field name="quantity">10.0</field>
+        </record>
+
+        <record id="stock_quant_denso_plug" model="stock.quant">
+            <field name="product_id" ref="product_denso_spark_plug"/>
+            <field name="location_id" ref="stock_location_karage_main"/>
+            <field name="quantity">10.0</field>
+        </record>
+
+        <record id="stock_quant_brembo_pads" model="stock.quant">
+            <field name="product_id" ref="product_brembo_brake_pads"/>
+            <field name="location_id" ref="stock_location_karage_main"/>
+            <field name="quantity">10.0</field>
+        </record>
+
+        <record id="stock_quant_michelin_tire" model="stock.quant">
+            <field name="product_id" ref="product_michelin_tire_195"/>
+            <field name="location_id" ref="stock_location_karage_main"/>
+            <field name="quantity">10.0</field>
+        </record>
+
+        <record id="stock_quant_continental_tire" model="stock.quant">
+            <field name="product_id" ref="product_continental_tire_205"/>
+            <field name="location_id" ref="stock_location_karage_main"/>
+            <field name="quantity">10.0</field>
+        </record>
+    </data>
+</odoo>

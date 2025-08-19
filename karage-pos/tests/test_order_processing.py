@@ -154,7 +154,8 @@ class TestProductSync(TransactionCase):
         self.test_product = self.env['product.product'].create({
             'name': 'Test Oil Product',
             'default_code': '12345',
-            'type': 'product',
+            'type': 'consu',
+            'is_storable': True,
             'list_price': 50.0,
             'standard_price': 30.0,
         })

@@ -1,31 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
-        <!-- Inherit POS Config Form to Add Karage Fields -->
+        <!-- Extend POS Config Form View to add Karage fields -->
         <record id="view_pos_config_form_karage" model="ir.ui.view">
             <field name="name">pos.config.form.karage</field>
             <field name="model">pos.config</field>
             <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
             <field name="arch" type="xml">
-                <xpath expr="//sheet" position="inside">
-                    <group string="Karage Integration" name="karage_integration">
-                        <field name="karage_location_id"/>
-                        <field name="karage_auto_invoice"/>
-                        <field name="karage_default_customer"/>
-                    </group>
+                <xpath expr="//div[@class='row mt16 o_settings_container'][1]" position="before">
+                    <div class="row mt16 o_settings_container">
+                        <div class="o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <span class="o_form_label">Karage Integration</span>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <div class="content-group">
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <label for="karage_location_id" string="Karage Location ID"/>
+                                            <field name="karage_location_id" placeholder="e.g. 404"/>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <field name="karage_auto_invoice"/>
+                                            <label for="karage_auto_invoice" string="Auto Generate Invoices"/>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <label for="karage_default_customer" string="Default Customer"/>
+                                            <field name="karage_default_customer"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </xpath>
             </field>
         </record>
 
-        <!-- POS Config Tree View for Karage -->
+        <!-- Extend POS Config Tree View to add Karage fields -->
         <record id="view_pos_config_tree_karage" model="ir.ui.view">
             <field name="name">pos.config.tree.karage</field>
             <field name="model">pos.config</field>
             <field name="inherit_id" ref="point_of_sale.view_pos_config_tree"/>
             <field name="arch" type="xml">
-                <xpath expr="//field[@name='last_session_closing_cash']" position="after">
+                <field name="name" position="after">
                     <field name="karage_location_id" string="Karage Location" optional="hide"/>
-                </xpath>
+                    <field name="karage_auto_invoice" string="Auto Invoice" optional="hide"/>
+                </field>
             </field>
         </record>
 

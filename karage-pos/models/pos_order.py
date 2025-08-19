@@ -96,12 +96,11 @@ class PosOrder(models.Model):
 
     def _validate_karage_order_data(self, order_data):
         """Validate required fields in order data"""
-        required_fields = ['LocationID', 'OrderDetails']
-        missing_fields = [field for field in required_fields if not order_data.get(field)]
-        
-        if missing_fields:
-            raise ValidationError(f"Missing required fields: {', '.join(missing_fields)}")
+        # Check LocationID specifically (0 is a valid LocationID)
+        if 'LocationID' not in order_data:
+            raise ValidationError("Missing required field: LocationID")
             
+        # Check OrderDetails
         if not order_data.get('OrderDetails'):
             raise ValidationError("Order must contain at least one item")
 
@@ -164,14 +163,20 @@ class PosOrder(models.Model):
         for detail in order_details:
             product = self._get_or_create_product_karage(detail)
             
-            # Create POS order line
+            # Create POS order line with required fields
+            quantity = detail.get('Quantity', 1)
+            price_unit = detail.get('Price', 0)
+            discount = self._calculate_discount_percent_karage(detail)
+            
             line_vals = {
                 'order_id': pos_order.id,
                 'product_id': product.id,
-                'qty': detail.get('Quantity', 1),
-                'price_unit': detail.get('Price', 0),
-                'discount': self._calculate_discount_percent_karage(detail),
+                'qty': quantity,
+                'price_unit': price_unit,
+                'discount': discount,
                 'full_product_name': detail.get('Name', product.name),
+                'price_subtotal': price_unit * quantity * (1 - discount / 100),
+                'price_subtotal_incl': price_unit * quantity * (1 - discount / 100),  # Assuming no tax
             }
             
             self.env['pos.order.line'].create(line_vals)
@@ -191,7 +196,8 @@ class PosOrder(models.Model):
         product_vals = {
             'name': order_detail.get('Name', f"Product {item_id}"),
             'default_code': str(item_id) if item_id else None,
-            'type': 'product',  # Stockable product for proper inventory
+            'type': 'consu',  # Consumable product for proper inventory
+            'is_storable': True,  # Enable inventory tracking
             'list_price': order_detail.get('Price', 0),
             'standard_price': order_detail.get('Cost', 0),
             'categ_id': self._get_karage_product_category(order_detail.get('itemType')),
@@ -245,7 +251,7 @@ class PosOrder(models.Model):
             return
             
         for payment_detail in checkout_details:
-            payment_method = self._get_karage_payment_method(payment_detail)
+            payment_method = self._get_karage_payment_method(payment_detail, pos_order.session_id)
             amount_paid = payment_detail.get('AmountPaid', 0)
             
             if amount_paid > 0:
@@ -260,22 +266,43 @@ class PosOrder(models.Model):
                 
                 self.env['pos.payment'].create(payment_vals)
 
-    def _get_karage_payment_method(self, payment_detail):
+    def _get_karage_payment_method(self, payment_detail, pos_session=None):
         """Get appropriate payment method based on Karage payment data"""
         card_type = payment_detail.get('CardType', '').lower()
         
-        # Map Karage payment types to POS payment methods
-        try:
+        # Use the provided session to find available payment methods
+        if pos_session and pos_session.config_id.payment_method_ids:
+            available_methods = pos_session.config_id.payment_method_ids
+            
+            # Look for cash method first
             if 'cash' in card_type:
-                return self.env.ref('karage-pos.payment_method_cash_karage')
-            elif 'card' in card_type or 'credit' in card_type or 'debit' in card_type:
-                return self.env.ref('karage-pos.payment_method_card_karage')
-            else:
-                # Default to cash for unknown payment types
-                return self.env.ref('karage-pos.payment_method_cash_karage')
-        except ValueError:
-            # If payment methods don't exist, create a basic cash method
-            return self._get_or_create_cash_payment_method()
+                cash_method = available_methods.filtered(lambda pm: 'cash' in pm.name.lower())
+                if cash_method:
+                    return cash_method[0]
+            
+            # Look for card method
+            if 'card' in card_type or 'credit' in card_type or 'debit' in card_type:
+                card_method = available_methods.filtered(lambda pm: 'card' in pm.name.lower())
+                if card_method:
+                    return card_method[0]
+            
+            # Default to first available method
+            if available_methods:
+                return available_methods[0]
+        
+        # Fallback: Look for any payment method
+        if 'cash' in card_type:
+            cash_method = self.env['pos.payment.method'].search([('name', 'ilike', 'cash')], limit=1)
+            if cash_method:
+                return cash_method
+        
+        # Default to any available payment method
+        any_method = self.env['pos.payment.method'].search([], limit=1)
+        if any_method:
+            return any_method
+            
+        # Last resort: create a basic cash method
+        return self._get_or_create_cash_payment_method()
 
     def _get_or_create_cash_payment_method(self):
         """Get or create a basic cash payment method"""
@@ -300,3 +327,35 @@ class PosOrder(models.Model):
             })
             
         return cash_method
+    
+    def action_view_invoice(self):
+        """Action to view the generated invoice"""
+        self.ensure_one()
+        if self.account_move:
+            return {
+                'type': 'ir.actions.act_window',
+                'name': 'Invoice',
+                'res_model': 'account.move',
+                'res_id': self.account_move.id,
+                'view_mode': 'form',
+                'target': 'current',
+            }
+        return False
+    
+    def action_view_picking(self):
+        """Action to view related stock moves"""
+        self.ensure_one()
+        stock_moves = self.env['stock.move'].search([
+            ('origin', '=', self.name)
+        ])
+        
+        if stock_moves:
+            return {
+                'type': 'ir.actions.act_window',
+                'name': 'Stock Moves',
+                'res_model': 'stock.move',
+                'view_mode': 'tree,form',
+                'domain': [('id', 'in', stock_moves.ids)],
+                'target': 'current',
+            }
+        return False
