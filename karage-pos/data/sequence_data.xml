@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Sequence for Karage POS Orders -->
+        <record id="sequence_karage_pos_order" model="ir.sequence">
+            <field name="name">Karage POS Order</field>
+            <field name="code">karage.pos.order</field>
+            <field name="prefix">KPOS/%(year)s/</field>
+            <field name="suffix"></field>
+            <field name="padding">5</field>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <!-- Sequence for Karage POS Sessions -->
+        <record id="sequence_karage_pos_session" model="ir.sequence">
+            <field name="name">Karage POS Session</field>
+            <field name="code">karage.pos.session</field>
+            <field name="prefix">KPOS-SESSION/%(year)s/</field>
+            <field name="suffix"></field>
+            <field name="padding">4</field>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <!-- Sequence for Request Logger -->
+        <record id="sequence_karage_request_log" model="ir.sequence">
+            <field name="name">Karage Request Log</field>
+            <field name="code">karage.request.log</field>
+            <field name="prefix">KREQ/%(year)s/%(month)s/</field>
+            <field name="suffix"></field>
+            <field name="padding">6</field>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+    </data>
+</odoo>

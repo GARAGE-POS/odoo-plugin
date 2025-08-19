@@ -17,6 +17,16 @@
     #"post_init_hook": "post_init_hook",
     #"post_load": "post_load",
     #"uninstall_hook": "uninstall_hook",    
-    "depends": ['base', 'account', 'stock'],
-    "data": [],
+    "depends": ['base', 'sale', 'stock', 'product', 'account', 'stock_account'],
+    "data": [
+        'security/ir.model.access.csv',
+        'security/security.xml',
+        'data/pos_config_data.xml',
+        'data/payment_method_data.xml',
+        'data/sequence_data.xml',
+        'views/pos_config_views.xml',
+        'views/pos_order_views.xml',
+        'views/pos_session_views.xml',
+        'views/menu_views.xml',
+    ],
 }

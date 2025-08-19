@@ -1,3 +1,59 @@
 {
-    
+    "CreditCustomerID": 0,
+    "CustomerContact": "",
+    "DiscountCode": "",
+    "AmountTotal": 25,
+    "LocationID": 404,
+    "CheckoutDate": "10-08-2025 05:16:43 PM",
+    "CustomerID": 0,
+    "Remark": "",
+    "OrderDetails": [
+        {
+            "itemType": "oil",
+            "ItemID": 170388,
+            "checkQty": 0,
+            "AlternateName": "زيت فوكس 5W30 Syn Sn ",
+            "Name": "Fuchs Oil 5W30 Syn Sn ",
+            "localStock": -169,
+            "PackageID": 0,
+            "IsInventoryItem": true,
+            "UniqueID": 1907401772308368892,
+            "OrderDetailID": 0,
+            "DiscountAmount": 0,
+            "OldQuantity": 0,
+            "Cost": 20,
+            "CurrentStock": -168,
+            "Mode": "Add",
+            "OrderDetailPackages": [],
+            "ItemTypeValue": "10000",
+            "Price": 25,
+            "Status": 201,
+            "Quantity": 1
+        }
+    ],
+    "OrderCheckoutDetails": [
+        {
+            "PaymentMode": 1,
+            "AmountDiscount": 0,
+            "CardNumber": "",
+            "AmountPaid": 18.75,
+            "CardType": "Cash",
+            "CardHolderName": ""
+        }
+    ],
+    "OrderStatus": 103,
+    "AmountPaid": 18.75,
+    "DiscountPercent": 0,
+    "HolderName": "",
+    "PartialPayment": 0,
+    "CustomerName": "",
+    "GrandTotal": 18.75,
+    "AmountDiscount": 6.25,
+    "TaxPercent": 0,
+    "IsPartialPaid": false,
+    "ServiceCharges": 0,
+    "Tax": 0,
+    "BalanceAmount": 0,
+    "PaymentMode": 1,
+    "OrderTakerID": "2487"
 }

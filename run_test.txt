@@ -1,1 +1,0 @@
-odoo --test-enable --update=karage-pos --addons-path=/mnt/extra-addons --stop-after-init 

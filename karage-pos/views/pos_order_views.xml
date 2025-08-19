@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Inherit POS Order Form to Add Karage Fields -->
+        <record id="view_pos_order_form_karage" model="ir.ui.view">
+            <field name="name">pos.order.form.karage</field>
+            <field name="model">pos.order</field>
+            <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='pos_reference']" position="after">
+                    <field name="karage_order_id" string="Karage Order ID" readonly="1"/>
+                    <field name="karage_location_id" string="Karage Location" readonly="1"/>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- POS Order Tree View for Karage -->
+        <record id="view_pos_order_tree_karage" model="ir.ui.view">
+            <field name="name">pos.order.tree.karage</field>
+            <field name="model">pos.order</field>
+            <field name="inherit_id" ref="point_of_sale.view_pos_order_tree"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='name']" position="after">
+                    <field name="karage_order_id" string="Karage ID"/>
+                    <field name="karage_location_id" string="Location"/>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Action for Karage POS Orders -->
+        <record id="action_karage_pos_order" model="ir.actions.act_window">
+            <field name="name">Karage POS Orders</field>
+            <field name="res_model">pos.order</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[('karage_order_id', '!=', False)]</field>
+            <field name="context">{}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No Karage POS orders found
+                </p>
+                <p>
+                    Orders from Karage POS API will appear here.
+                    These orders are automatically created when the API receives order data from Karage POS systems.
+                </p>
+            </field>
+        </record>
+    </data>
+</odoo>

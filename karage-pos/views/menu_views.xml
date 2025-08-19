@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Main Karage POS Menu -->
+        <menuitem
+            id="menu_karage_pos_root"
+            name="Karage POS"
+            parent="point_of_sale.menu_point_root"
+            sequence="10"/>
+
+        <!-- Configuration Menu -->
+        <menuitem
+            id="menu_karage_config"
+            name="Configuration"
+            parent="menu_karage_pos_root"
+            sequence="100"/>
+
+        <!-- POS Configurations Menu -->
+        <menuitem
+            id="menu_karage_pos_config"
+            name="POS Configurations"
+            parent="menu_karage_config"
+            action="action_karage_pos_config"
+            sequence="10"/>
+
+        <!-- Request Logs Menu -->
+        <menuitem
+            id="menu_karage_request_logs"
+            name="API Request Logs"
+            parent="menu_karage_pos_root"
+            action="action_karage_request_logger"
+            sequence="20"/>
+
+        <!-- Orders Menu -->
+        <menuitem
+            id="menu_karage_orders"
+            name="Orders"
+            parent="menu_karage_pos_root"
+            action="action_karage_pos_order"
+            sequence="30"/>
+
+        <!-- Sessions Menu -->
+        <menuitem
+            id="menu_karage_sessions"
+            name="Sessions"
+            parent="menu_karage_pos_root"
+            action="action_karage_pos_session"
+            sequence="40"/>
+    </data>
+</odoo>

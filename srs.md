@@ -1,4 +1,0 @@
-- API call happens
-- Log the API call to a table
-- Add it to the account module
-- respond back
