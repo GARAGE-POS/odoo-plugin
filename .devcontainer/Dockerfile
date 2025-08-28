@@ -50,6 +50,7 @@ RUN apt-get update && \
         gnupg \
         node-less \
         npm \
+    openssh-client \
     && if [ -z "${TARGETARCH}" ]; then \
         TARGETARCH="$(dpkg --print-architecture)"; \
     fi \
