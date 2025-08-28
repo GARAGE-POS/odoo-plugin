@@ -1,0 +1,81 @@
+name: Lint Code
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install linting dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pylint black isort bandit
+        
+    - name: Run Black (code formatter check)
+      run: |
+        black --check --diff karage-pos/
+        
+    - name: Run isort (import sorting check)
+      run: |
+        isort --check-only --diff karage-pos/
+        
+    - name: Run flake8 (style and syntax check)
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 karage-pos/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings. GitHub editor is 127 chars wide
+        flake8 karage-pos/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
+    - name: Run pylint (comprehensive code analysis)
+      run: |
+        # Create .pylintrc if it doesn't exist with Odoo-specific settings
+        cat > .pylintrc << EOF
+        [MASTER]
+        load-plugins=
+        jobs=1
+        
+        [MESSAGES CONTROL]
+        disable=C0111,C0103,R0903,R0913,W0613,C0415,R0801,W0511
+        
+        [FORMAT]
+        max-line-length=127
+        
+        [DESIGN]
+        max-args=8
+        max-attributes=12
+        max-locals=20
+        EOF
+        pylint karage-pos/ --exit-zero --rcfile=.pylintrc
+        
+    - name: Run bandit (security linting)
+      run: |
+        bandit -r karage-pos/ -f json -o bandit-report.json || true
+        bandit -r karage-pos/ -f txt
+        
+    - name: Upload bandit security report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: bandit-security-report
+        path: bandit-report.json
