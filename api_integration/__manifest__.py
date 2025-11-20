@@ -33,6 +33,8 @@
         'security/ir.model.access.csv',
         'security/api_security.xml',
         'views/api_config_views.xml',
+        'views/external_order_sync_views.xml',
+        'data/cron_data.xml',
     ],
     'installable': True,
     'application': False,

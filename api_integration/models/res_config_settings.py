@@ -27,3 +27,4 @@ class ResConfigSettings(models.TransientModel):
             record.is_installed_sale = bool(sale_module)
 
 
+

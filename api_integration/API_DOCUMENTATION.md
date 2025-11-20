@@ -577,6 +577,309 @@ Create a Point of Sale order from external API by sending JSON data.
 
 For complete POS Order API documentation, see [POS_ORDER_API.md](POS_ORDER_API.md).
 
+## POS Order Webhook API
+
+### Endpoint
+```
+POST /api/v1/webhook/pos-order
+```
+
+### Description
+Webhook endpoint to create and confirm POS orders from external systems. This endpoint automatically:
+- Creates the POS order
+- Confirms the order (marks as paid)
+- Generates inventory consumption (picking)
+- Creates accounting payment entries
+
+### Authentication
+API key can be provided in:
+- Request header: `X-API-Key: your-api-key`
+- Request body: `{"api_key": "your-api-key", ...}`
+
+### Request Body Format
+
+```json
+{
+  "OrderID": 639,
+  "AmountDiscount": 0.0,
+  "AmountPaid": "92.0",
+  "AmountTotal": 80.0,
+  "BalanceAmount": 0.0,
+  "GrandTotal": 92.0,
+  "Tax": 12.0,
+  "TaxPercent": 15.0,
+  "OrderStatus": 103,
+  "PaymentMode": 1,
+  "CheckoutDetails": [
+    {
+      "AmountPaid": 92.0,
+      "CardNumber": "",
+      "CardType": "Cash",
+      "PaymentMode": 1,
+      "ReferenceID": ""
+    }
+  ],
+  "OrderItems": [
+    {
+      "AlternateName": "",
+      "Cost": 15.0,
+      "DiscountAmount": 0.0,
+      "ItemID": 0,
+      "ItemName": "P1",
+      "OrderDetailID": 1956104,
+      "OrderDetailPackages": [
+        {
+          "AlternateName": "",
+          "AlternativeName": "",
+          "Cost": 0.0,
+          "CurrentStock": 0.0,
+          "Discount": 0.0,
+          "DiscoutType": "",
+          "ItemID": 175741,
+          "ItemName": "I1",
+          "Name": "I1",
+          "PackageDetailID": 0,
+          "PackageID": 0,
+          "Price": 20.0,
+          "Quantity": 2.0,
+          "StatusID": 1
+        }
+      ],
+      "OrderID": 639,
+      "PackageID": 3246,
+      "Price": 80.0,
+      "Quantity": 1.0
+    }
+  ]
+}
+```
+
+### Field Descriptions
+
+#### Root Level Fields
+- **OrderID** (required): External order identifier
+- **AmountDiscount** (optional): Total discount amount
+- **AmountPaid** (required): Total amount paid (string or number)
+- **AmountTotal** (required): Subtotal before tax
+- **BalanceAmount** (optional): Remaining balance
+- **GrandTotal** (required): Total including tax
+- **Tax** (optional): Tax amount
+- **TaxPercent** (optional): Tax percentage
+- **OrderStatus** (optional): Order status code
+- **PaymentMode** (optional): Payment mode identifier
+
+#### OrderItems Array
+Each order item contains:
+- **ItemID** (optional): Product ID (if it's an Odoo product ID)
+- **ItemName** (required): Product name (used to find product if ItemID is 0)
+- **Price** (required): Unit price
+- **Quantity** (required): Quantity ordered
+- **DiscountAmount** (optional): Discount amount for this item
+- **Cost** (optional): Cost of the item
+- **PackageID** (optional): Package identifier
+- **OrderDetailPackages** (optional): Array of component items that need to be consumed from inventory
+
+#### OrderDetailPackages Array
+Component items within an order item:
+- **ItemID** (optional): Component product ID
+- **ItemName** (optional): Component product name
+- **Quantity** (required): Quantity to consume
+- **Price** (optional): Component price
+- **Cost** (optional): Component cost
+
+#### CheckoutDetails Array
+Payment information:
+- **AmountPaid** (required): Payment amount
+- **CardType** (optional): Payment type (e.g., "Cash", "Card")
+- **PaymentMode** (optional): Payment mode identifier
+- **ReferenceID** (optional): Payment reference
+- **CardNumber** (optional): Card number (if applicable)
+
+### Data Validation
+
+The webhook performs the following validations:
+1. **Total Consistency**: Validates that calculated totals match provided totals
+2. **Payment Consistency**: Ensures payment amounts match AmountPaid
+3. **Product Existence**: Verifies all products exist in Odoo
+4. **Payment Method**: Validates payment methods are available
+
+### Response Example
+
+#### Success Response
+```json
+{
+  "status": "success",
+  "data": {
+    "id": 123,
+    "name": "Order 00001",
+    "pos_reference": "00001",
+    "amount_total": 92.0,
+    "amount_paid": 92.0,
+    "amount_tax": 12.0,
+    "state": "paid",
+    "date_order": "2024-01-15 10:30:00",
+    "external_order_id": 639
+  },
+  "error": null,
+  "count": 1
+}
+```
+
+#### Error Response
+```json
+{
+  "status": "error",
+  "data": null,
+  "error": "Data inconsistency: Calculated total (92.0) does not match GrandTotal (90.0)",
+  "count": 0
+}
+```
+
+### Error Codes
+
+| Status Code | Description |
+|-------------|-------------|
+| 400 | Bad Request - Invalid data or missing required fields |
+| 401 | Unauthorized - Invalid or missing API key |
+| 404 | Not Found - Product or payment method not found |
+| 500 | Internal Server Error - Server-side error |
+
+### Common Errors
+
+#### Product Not Found
+```json
+{
+  "status": "error",
+  "data": null,
+  "error": "Product not found: ItemName=\"P1\", ItemID=0",
+  "count": 0
+}
+```
+
+**Solution:** Ensure products exist in Odoo with matching names or IDs, and are available in POS.
+
+#### No Open POS Session
+```json
+{
+  "status": "error",
+  "data": null,
+  "error": "No open POS session found. Please open a POS session first.",
+  "count": 0
+}
+```
+
+**Solution:** Open a POS session in Odoo before sending webhook requests.
+
+#### Data Inconsistency
+```json
+{
+  "status": "error",
+  "data": null,
+  "error": "Data inconsistency: Calculated total (92.0) does not match GrandTotal (90.0)",
+  "count": 0
+}
+```
+
+**Solution:** Verify that AmountTotal, Tax, and GrandTotal are correctly calculated in your system.
+
+### Usage Example
+
+#### cURL Example
+```bash
+curl -X POST "http://your-odoo-instance.com/api/v1/webhook/pos-order" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "OrderID": 639,
+    "AmountPaid": "92.0",
+    "AmountTotal": 80.0,
+    "GrandTotal": 92.0,
+    "Tax": 12.0,
+    "TaxPercent": 15.0,
+    "OrderItems": [
+      {
+        "ItemName": "P1",
+        "Price": 80.0,
+        "Quantity": 1.0
+      }
+    ],
+    "CheckoutDetails": [
+      {
+        "AmountPaid": 92.0,
+        "CardType": "Cash",
+        "PaymentMode": 1
+      }
+    ]
+  }'
+```
+
+#### Python Example
+```python
+import requests
+import json
+
+url = "http://your-odoo-instance.com/api/v1/webhook/pos-order"
+headers = {
+    "Content-Type": "application/json",
+    "X-API-Key": "your-api-key"
+}
+
+data = {
+    "OrderID": 639,
+    "AmountPaid": "92.0",
+    "AmountTotal": 80.0,
+    "GrandTotal": 92.0,
+    "Tax": 12.0,
+    "TaxPercent": 15.0,
+    "OrderItems": [
+        {
+            "ItemName": "P1",
+            "Price": 80.0,
+            "Quantity": 1.0,
+            "OrderDetailPackages": [
+                {
+                    "ItemName": "I1",
+                    "Quantity": 2.0,
+                    "Price": 20.0
+                }
+            ]
+        }
+    ],
+    "CheckoutDetails": [
+        {
+            "AmountPaid": 92.0,
+            "CardType": "Cash",
+            "PaymentMode": 1
+        }
+    ]
+}
+
+response = requests.post(url, headers=headers, data=json.dumps(data))
+result = response.json()
+
+if result['status'] == 'success':
+    print(f"Order created: {result['data']['name']}")
+else:
+    print(f"Error: {result['error']}")
+```
+
+### Notes
+
+1. **Product Matching**: Products are matched by:
+   - ItemID (if > 0 and exists in Odoo)
+   - ItemName (exact match first, then case-insensitive)
+
+2. **Payment Methods**: Payment methods are matched by:
+   - CardType name (e.g., "Cash")
+   - PaymentMode (1 = Cash by default)
+   - Falls back to first available payment method
+
+3. **Inventory Consumption**: OrderDetailPackages are logged but not automatically consumed. If you need automatic consumption, you may need to extend the webhook to create additional order lines or stock moves.
+
+4. **Tax Calculation**: Taxes are calculated based on product tax settings and fiscal position. The TaxPercent in the request is used for validation only.
+
+5. **Order Confirmation**: Orders are automatically confirmed (marked as paid) and inventory consumption is generated via `_create_order_picking()`.
+
 ## Support
 
 For technical support or questions:
