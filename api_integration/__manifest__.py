@@ -28,6 +28,8 @@
         'product',
         'purchase',
         'point_of_sale',
+        'account',
+        'stock',
     ],
     'data': [
         'security/ir.model.access.csv',
