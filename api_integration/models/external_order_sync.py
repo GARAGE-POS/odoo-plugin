@@ -158,6 +158,23 @@ class ExternalOrderSync(models.Model):
             # Get or create POS session
             pos_session = self._get_or_create_pos_session()
             
+            # Validate that payment methods have journals configured
+            payment_methods = pos_session.payment_method_ids
+            if not payment_methods:
+                _logger.error(f'No payment methods configured for POS session {pos_session.name}')
+                raise UserError(_('No payment methods configured for this POS session. Please configure payment methods first.'))
+            
+            # Check if all payment methods have journals
+            missing_journals = []
+            for payment_method in payment_methods:
+                if not payment_method.journal_id:
+                    missing_journals.append(payment_method.name)
+            
+            if missing_journals:
+                error_msg = _('Journal not found for payment method(s): %s. Please configure journals for all payment methods.') % ', '.join(missing_journals)
+                _logger.error(error_msg)
+                raise UserError(error_msg)
+            
             # Validate required fields
             if not order_data.get('OrderItems'):
                 _logger.warning(f'Order {order_data.get("OrderID")} has no items, skipping')
@@ -252,24 +269,54 @@ class ExternalOrderSync(models.Model):
                 if amount <= 0:
                     continue
                 
-                # Find payment method
+                # PaymentMode to Journal Name mapping
+                payment_mode_mapping = {
+                    1: 'Cash',
+                    2: 'Card',
+                    3: 'Credit',
+                    5: 'Tabby',
+                    6: 'Tamara',
+                    7: 'StcPay',
+                    8: 'Bank Transfer',
+                }
+                
+                # Find payment method based on PaymentMode mapping
                 payment_method = None
-                if payment_mode == 1 or card_type == 'Cash':
+                journal_search_name = payment_mode_mapping.get(payment_mode)
+                
+                if journal_search_name:
+                    # Search for payment method where journal name contains the mapped name
+                    payment_method = pos_session.payment_method_ids.filtered(
+                        lambda p: p.journal_id and journal_search_name.lower() in p.journal_id.name.lower()
+                    )[:1]
+                
+                # Fallback: If PaymentMode not in mapping or not found, try card_type
+                if not payment_method and card_type:
+                    payment_method = pos_session.payment_method_ids.filtered(
+                        lambda p: p.journal_id and card_type.lower() in p.journal_id.name.lower()
+                    )[:1]
+                
+                # Fallback: Try is_cash_count for PaymentMode = 1
+                if not payment_method and payment_mode == 1:
                     payment_method = pos_session.payment_method_ids.filtered(
                         lambda p: p.is_cash_count
                     )[:1]
                 
                 if not payment_method:
-                    payment_method = pos_session.payment_method_ids.filtered(
-                        lambda p: card_type.lower() in p.name.lower()
-                    )[:1]
+                    if journal_search_name:
+                        error_msg = _('Payment method with journal name containing "%s" not found for PaymentMode=%s. Please configure a payment method with a journal containing "%s" in its name.') % (journal_search_name, payment_mode, journal_search_name)
+                        _logger.error(error_msg)
+                        raise UserError(error_msg)
+                    else:
+                        error_msg = _('No payment method found for PaymentMode=%s, CardType=%s. PaymentMode must be 1 (Cash), 2 (Card), 3 (Credit), 5 (Tabby), 6 (Tamara), 7 (StcPay), or 8 (Bank Transfer).') % (payment_mode, card_type)
+                        _logger.error(error_msg)
+                        raise UserError(error_msg)
                 
-                if not payment_method:
-                    payment_method = pos_session.payment_method_ids[:1]
-                
-                if not payment_method:
-                    _logger.warning(f'No payment method found for PaymentMode={payment_mode}')
-                    continue
+                # Validate that payment method has a journal configured
+                if not payment_method.journal_id:
+                    error_msg = _('Journal not found for payment method: %s. Please configure a journal for this payment method.') % payment_method.name
+                    _logger.error(error_msg)
+                    raise UserError(error_msg)
                 
                 total_paid += amount
                 payment_lines.append((0, 0, {

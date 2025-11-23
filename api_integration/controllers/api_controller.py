@@ -510,6 +510,28 @@ class APIController(http.Controller):
                     error=f'POS session {pos_session.name} is not open (state: {pos_session.state})'
                 )
             
+            # Validate that payment methods have journals configured
+            payment_methods = pos_session.payment_method_ids
+            if not payment_methods:
+                return self._json_response(
+                    None,
+                    status=400,
+                    error='No payment methods configured for this POS session. Please configure payment methods first.'
+                )
+            
+            # Check if all payment methods have journals
+            missing_journals = []
+            for payment_method in payment_methods:
+                if not payment_method.journal_id:
+                    missing_journals.append(payment_method.name)
+            
+            if missing_journals:
+                return self._json_response(
+                    None,
+                    status=400,
+                    error=f'Journal not found for payment method(s): {", ".join(missing_journals)}. Please configure journals for all payment methods.'
+                )
+            
             # Prepare order data
             order_vals = {
                 'session_id': pos_session.id,
@@ -597,6 +619,14 @@ class APIController(http.Controller):
                         None,
                         status=404,
                         error=f'Payment method {payment_data["payment_method_id"]} not found'
+                    )
+                
+                # Validate that payment method has a journal configured
+                if not payment_method.journal_id:
+                    return self._json_response(
+                        None,
+                        status=400,
+                        error=f'Journal not found for payment method: {payment_method.name}. Please configure a journal for this payment method.'
                     )
                 
                 amount = float(payment_data.get('amount', 0.0))
@@ -738,6 +768,28 @@ class APIController(http.Controller):
                     None,
                     status=400,
                     error='No open POS session found. Please open a POS session first.'
+                )
+            
+            # Validate that payment methods have journals configured
+            payment_methods = pos_session.payment_method_ids
+            if not payment_methods:
+                return self._json_response(
+                    None,
+                    status=400,
+                    error='No payment methods configured for this POS session. Please configure payment methods first.'
+                )
+            
+            # Check if all payment methods have journals
+            missing_journals = []
+            for payment_method in payment_methods:
+                if not payment_method.journal_id:
+                    missing_journals.append(payment_method.name)
+            
+            if missing_journals:
+                return self._json_response(
+                    None,
+                    status=400,
+                    error=f'Journal not found for payment method(s): {", ".join(missing_journals)}. Please configure journals for all payment methods.'
                 )
             
             # Validate data consistency
@@ -909,6 +961,17 @@ class APIController(http.Controller):
             payment_lines = []
             total_paid = 0.0
             
+            # PaymentMode to Journal Name mapping
+            payment_mode_mapping = {
+                1: 'Cash',
+                2: 'Card',
+                3: 'Credit',
+                5: 'Tabby',
+                6: 'Tamara',
+                7: 'StcPay',
+                8: 'Bank Transfer',
+            }
+            
             for checkout in data.get('CheckoutDetails', []):
                 payment_mode = checkout.get('PaymentMode', 1)
                 amount = float(str(checkout.get('AmountPaid', 0)).replace(',', ''))
@@ -918,31 +981,48 @@ class APIController(http.Controller):
                 if amount <= 0:
                     continue
                 
-                # Find payment method by name or create mapping
-                # PaymentMode: 1 = Cash, others might be different payment methods
+                # Find payment method based on PaymentMode mapping
                 payment_method = None
+                journal_search_name = payment_mode_mapping.get(payment_mode)
                 
-                if payment_mode == 1 or card_type == 'Cash':
-                    # Find cash payment method
+                if journal_search_name:
+                    # Search for payment method where journal name contains the mapped name
+                    payment_method = pos_session.payment_method_ids.filtered(
+                        lambda p: p.journal_id and journal_search_name.lower() in p.journal_id.name.lower()
+                    )[:1]
+                
+                # Fallback: If PaymentMode not in mapping or not found, try card_type
+                if not payment_method and card_type:
+                    payment_method = pos_session.payment_method_ids.filtered(
+                        lambda p: p.journal_id and card_type.lower() in p.journal_id.name.lower()
+                    )[:1]
+                
+                # Fallback: Try is_cash_count for PaymentMode = 1
+                if not payment_method and payment_mode == 1:
                     payment_method = pos_session.payment_method_ids.filtered(
                         lambda p: p.is_cash_count
                     )[:1]
                 
                 if not payment_method:
-                    # Try to find by name
-                    payment_method = pos_session.payment_method_ids.filtered(
-                        lambda p: card_type.lower() in p.name.lower()
-                    )[:1]
+                    if journal_search_name:
+                        return self._json_response(
+                            None,
+                            status=400,
+                            error=f'Payment method with journal name containing "{journal_search_name}" not found for PaymentMode={payment_mode}. Please configure a payment method with a journal containing "{journal_search_name}" in its name.'
+                        )
+                    else:
+                        return self._json_response(
+                            None,
+                            status=400,
+                            error=f'No payment method found for PaymentMode={payment_mode}, CardType={card_type}. PaymentMode must be 1 (Cash), 2 (Card), 3 (Credit), 5 (Tabby), 6 (Tamara), 7 (StcPay), or 8 (Bank Transfer).'
+                        )
                 
-                if not payment_method:
-                    # Get first available payment method
-                    payment_method = pos_session.payment_method_ids[:1]
-                
-                if not payment_method:
+                # Validate that payment method has a journal configured
+                if not payment_method.journal_id:
                     return self._json_response(
                         None,
                         status=400,
-                        error=f'No payment method found for PaymentMode={payment_mode}, CardType={card_type}'
+                        error=f'Journal not found for payment method: {payment_method.name}. Please configure a journal for this payment method.'
                     )
                 
                 total_paid += amount

@@ -55,7 +55,3 @@ case "$1" in
         echo "[entrypoint] Executing custom command: $@"
         exec "$@"
 esac
-
-/usr/bin/python3 -m pip install --break-system-packages --no-cache-dir debugpy coverage
-
-exit 1

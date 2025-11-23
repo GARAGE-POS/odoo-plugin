@@ -88,6 +88,9 @@ RUN wget -q -O - https://nightly.odoo.com/odoo.key | gpg --dearmor -o /usr/share
     && apt-get install -y --no-install-recommends odoo \
     && rm -rf /var/lib/apt/lists/*
 
+# Install debugpy and coverage for debugging and testing
+RUN /usr/bin/python3 -m pip install --break-system-packages --no-cache-dir debugpy coverage
+
 # Copy entrypoint script and Odoo configuration file
 COPY ./entrypoint.sh /
 COPY ./odoo.conf /etc/odoo/
