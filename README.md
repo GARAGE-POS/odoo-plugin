@@ -7,8 +7,8 @@ This project provides complete integration between Karage POS systems and Odoo 1
 ### With DevContainer (Recommended)
 ```bash
 # Open in VS Code and reopen in container, then:
-odoo --init=karage-pos --addons-path=/workspace --stop-after-init
-odoo --test-enable --update=karage-pos --addons-path=/workspace --stop-after-init --log-level=test
+odoo --init=karage-pos --addons-path=/mnt/extra-addons --stop-after-init
+odoo --test-enable --update=karage-pos --addons-path=/mnt/extra-addons --stop-after-init --log-level=test
 ```
 
 ### Local Installation

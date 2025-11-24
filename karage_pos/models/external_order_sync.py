@@ -427,16 +427,3 @@ class ExternalOrderSync(models.Model):
                 'last_sync_message': f'Error: {str(e)}',
             })
             raise
-
-    @api.model
-    def cron_sync_orders(self):
-        """Cron job method to sync orders from all active configurations"""
-        active_syncs = self.search([('active', '=', True)])
-        
-        for sync in active_syncs:
-            try:
-                sync.sync_orders()
-            except Exception as e:
-                _logger.error(f'Error in cron sync for {sync.name}: {str(e)}', exc_info=True)
-                # Continue with other syncs even if one fails
-
