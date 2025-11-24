@@ -293,17 +293,23 @@ class APIController(http.Controller):
                         # If we can't parse the response, return basic info
                         return self._json_response(
                             {
-                                "id": idempotency_record.pos_order_id.id
-                                if idempotency_record.pos_order_id
-                                else None,
-                                "name": idempotency_record.pos_order_id.name
-                                if idempotency_record.pos_order_id
-                                else None,
+                                "id": (
+                                    idempotency_record.pos_order_id.id
+                                    if idempotency_record.pos_order_id
+                                    else None
+                                ),
+                                "name": (
+                                    idempotency_record.pos_order_id.name
+                                    if idempotency_record.pos_order_id
+                                    else None
+                                ),
                                 "message": "Request already processed",
                                 "idempotency_key": idempotency_key,
-                                "processed_at": str(idempotency_record.processed_at)
-                                if idempotency_record.processed_at
-                                else None,
+                                "processed_at": (
+                                    str(idempotency_record.processed_at)
+                                    if idempotency_record.processed_at
+                                    else None
+                                ),
                             },
                             status=200,
                         )

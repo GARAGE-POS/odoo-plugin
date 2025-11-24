@@ -120,9 +120,9 @@ class WebhookLog(models.Model):
             "response_message": response_message,
             "success": success,
             "pos_order_id": pos_order_id.id if pos_order_id else False,
-            "idempotency_record_id": idempotency_record_id.id
-            if idempotency_record_id
-            else False,
+            "idempotency_record_id": (
+                idempotency_record_id.id if idempotency_record_id else False
+            ),
         }
         if processing_time is not None:
             update_vals["processing_time"] = processing_time
