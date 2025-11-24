@@ -99,8 +99,8 @@ jobs:
           --omit="*/tests/*,*/migrations/*,*/__pycache__/*" \
           -m odoo --test-enable \
           --update=karage_pos \
-          --database=odoo_test_coverage \
-          --db-filter=odoo_test_coverage \
+          --database=odoo_test_init \
+          --db-filter=odoo_test_init \
           --stop-after-init \
           --log-level=test
 

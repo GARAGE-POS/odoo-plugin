@@ -43,7 +43,7 @@ class TestExternalOrderSync(TransactionCase):
                 "journal_id": self.cash_journal.id,
             }
         )
-        self.pos_config.pricelist_id = self.env.ref('product.list0')
+        self.pos_config.pricelist_id = self.env.ref("product.list0")
 
         # Create product
         self.product = self.env["product.product"].create(
