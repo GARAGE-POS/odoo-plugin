@@ -2,9 +2,9 @@ name: Code Coverage
 
 on:
   push:
-    branches: [ fixes_to_integration ]
+    branches: [ main ]
   pull_request:
-    branches: [ fixes_to_integration ]
+    branches: [ main ]
 
 jobs:
   coverage:
@@ -28,6 +28,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0       
       
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -106,61 +108,9 @@ jobs:
       run: |
         coverage report --show-missing
         coverage xml -o coverage.xml
-        coverage html -d htmlcov/
+
+    - name: SonarQube Scan
+      uses: SonarSource/sonarqube-scan-action@v6
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         
-    - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-karage-pos
-        fail_ci_if_error: false
-        verbose: true
-        
-    - name: Upload coverage HTML report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: coverage-html-report
-        path: htmlcov/
-        
-    - name: Coverage Summary
-      run: |
-        echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
-        echo "```" >> $GITHUB_STEP_SUMMARY
-        coverage report >> $GITHUB_STEP_SUMMARY
-        echo "```" >> $GITHUB_STEP_SUMMARY
-        
-        # Get coverage percentage
-        COVERAGE=$(coverage report --format=total)
-        echo "Total Coverage: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
-        
-        # Set coverage as output for badges
-        echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
-        
-    - name: Comment PR with coverage
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          
-          // Read coverage report
-          const { execSync } = require('child_process');
-          const coverageOutput = execSync('coverage report', { encoding: 'utf8' });
-          
-          const comment = `## 📊 Code Coverage Report
-          
-          \`\`\`
-          ${coverageOutput}
-          \`\`\`
-          
-          📈 [Full coverage report](https://codecov.io/gh/${{ github.repository }})
-          `;
-          
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: comment
-          });
