@@ -43,7 +43,14 @@ class TestExternalOrderSync(TransactionCase):
                 "journal_id": self.cash_journal.id,
             }
         )
-        self.pos_config.pricelist_id = self.env.ref("product.list0")
+        try:
+            self.pos_config.pricelist_id = self.env.ref("product.list0")
+        except ValueError:
+            # Create a default pricelist if not found
+            self.pricelist = self.env["product.pricelist"].create(
+                {"name": "Default Pricelist", "currency_id": self.currency.id}
+            )
+            self.pos_config.pricelist_id = self.pricelist
 
         # Create product
         self.product = self.env["product.product"].create(
