@@ -43,7 +43,6 @@ class ExternalOrderSync(models.Model):
     )
     last_sync_date = fields.Datetime(
         string="Last Sync Date",
-        readonly=True,
         help="Last successful synchronization date",
     )
     last_sync_status = fields.Selection(
@@ -53,9 +52,8 @@ class ExternalOrderSync(models.Model):
             ("no_orders", "No Orders"),
         ],
         string="Last Sync Status",
-        readonly=True,
     )
-    last_sync_message = fields.Text(string="Last Sync Message", readonly=True)
+    last_sync_message = fields.Text(string="Last Sync Message")
     sync_interval = fields.Integer(
         string="Sync Interval (minutes)",
         default=15,
@@ -421,6 +419,7 @@ class ExternalOrderSync(models.Model):
                 line[2]["price_subtotal_incl"] - line[2]["price_subtotal"]
                 for line in order_lines
             )
+            total_amount_paid = sum(p[2]["amount"] for p in payment_lines)
 
             # Create POS order
             order_vals = {

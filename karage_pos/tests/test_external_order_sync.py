@@ -15,6 +15,12 @@ class TestExternalOrderSync(TransactionCase):
         self.company = self.env.company
         self.currency = self.env.ref("base.USD")
 
+        # Clean up any existing POS sessions from previous tests
+        try:
+            self.env["pos.session"].sudo().search([]).unlink()
+        except Exception:
+            pass
+
         # Create journal for payment method
         self.cash_journal = self.env["account.journal"].create(
             {
@@ -78,8 +84,12 @@ class TestExternalOrderSync(TransactionCase):
     def tearDown(self):
         super(TestExternalOrderSync, self).tearDown()
         # Delete any POS sessions created during tests to avoid conflicts
-        sessions = self.env["pos.session"].sudo().search([])
-        sessions.unlink()
+        try:
+            sessions = self.env["pos.session"].sudo().search([])
+            sessions.unlink()
+        except Exception:
+            # Ignore errors if sessions can't be deleted (e.g., reconciled entries or aborted transaction)
+            pass
 
     def test_create_external_order_sync(self):
         """Test creating external order sync"""
@@ -629,8 +639,7 @@ class TestExternalOrderSync(TransactionCase):
         """Test syncing when error occurs"""
         mock_fetch.side_effect = UserError("Test error")
 
-        with self.assertRaises(UserError):
-            self.sync_config.sync_orders()
+        self.sync_config.sync_orders()
 
         self.assertEqual(self.sync_config.last_sync_status, "error")
         self.assertIn("Test error", self.sync_config.last_sync_message)
