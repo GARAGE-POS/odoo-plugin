@@ -1,3 +1,14 @@
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=GARAGE-POS_odoo-plugin&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=GARAGE-POS_odoo-plugin)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=GARAGE-POS_odoo-plugin&metric=bugs)](https://sonarcloud.io/summary/new_code?id=GARAGE-POS_odoo-plugin)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=GARAGE-POS_odoo-plugin&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=GARAGE-POS_odoo-plugin)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=GARAGE-POS_odoo-plugin&metric=coverage)](https://sonarcloud.io/summary/new_code?id=GARAGE-POS_odoo-plugin)
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=GARAGE-POS_odoo-plugin&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=GARAGE-POS_odoo-plugin)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=GARAGE-POS_odoo-plugin&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=GARAGE-POS_odoo-plugin)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=GARAGE-POS_odoo-plugin&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=GARAGE-POS_odoo-plugin)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=GARAGE-POS_odoo-plugin&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=GARAGE-POS_odoo-plugin)
+[![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=GARAGE-POS_odoo-plugin&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=GARAGE-POS_odoo-plugin)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=GARAGE-POS_odoo-plugin&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=GARAGE-POS_odoo-plugin)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=GARAGE-POS_odoo-plugin&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=GARAGE-POS_odoo-plugin)
 # Karage POS Odoo Integration
 
 This project provides complete integration between Karage POS systems and Odoo 17 ERP through a custom addon module. The `karage-pos` module processes complete orders from external POS systems into Odoo's standard POS workflow, managing inventory, customers, products, and accounting automatically.
