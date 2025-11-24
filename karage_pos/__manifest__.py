@@ -18,13 +18,9 @@
         "account",
         "stock",
     ],
-    "data": [
-        "security/ir.model.access.csv",        
-        "views/external_order_sync_views.xml"        
-    ],
+    "data": ["security/ir.model.access.csv", "views/external_order_sync_views.xml"],
     "installable": True,
     "application": False,
     "auto_install": False,
     "license": "LGPL-3",
 }
-
