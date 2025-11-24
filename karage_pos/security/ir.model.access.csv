@@ -1,6 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_api_config_user,api.config.user,model_api_config,base.group_user,1,0,0,0
-access_api_config_manager,api.config.manager,model_api_config,base.group_system,1,1,1,1
 access_external_order_sync_user,external.order.sync.user,model_external_order_sync,base.group_user,1,0,0,0
 access_external_order_sync_manager,external.order.sync.manager,model_external_order_sync,base.group_system,1,1,1,1
 
