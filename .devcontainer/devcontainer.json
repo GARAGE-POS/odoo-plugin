@@ -3,6 +3,9 @@
   "dockerComposeFile": "docker-compose.yaml",
   "service": "odoo",
   "workspaceFolder": "/mnt/extra-addons",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
   "mounts": [
     "source=${localWorkspaceFolder},target=/mnt/extra-addons,type=bind,consistency=cached"
   ],
