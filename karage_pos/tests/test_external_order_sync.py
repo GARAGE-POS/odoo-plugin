@@ -75,6 +75,17 @@ class TestExternalOrderSync(TransactionCase):
             }
         )
 
+    def tearDown(self):
+        super(TestExternalOrderSync, self).tearDown()
+        # Close any open POS sessions created during tests
+        sessions = self.env["pos.session"].sudo().search([("state", "=", "opened")])
+        for session in sessions:
+            try:
+                session.action_pos_session_closing_control()
+            except Exception:
+                # Ignore errors if session can't be closed
+                pass
+
     def test_create_external_order_sync(self):
         """Test creating external order sync"""
         sync = self.env["external.order.sync"].create(
@@ -603,10 +614,10 @@ class TestExternalOrderSync(TransactionCase):
         self.assertEqual(pos_order.lines[0].product_id.id, self.product.id)
 
     @patch(
-        "karage_pos.models.external_order_sync.ExternalOrderSync._fetch_orders_from_external"
+        "odoo.addons.karage_pos.models.external_order_sync.ExternalOrderSync._fetch_orders_from_external"
     )
     @patch(
-        "karage_pos.models.external_order_sync.ExternalOrderSync._process_external_order"
+        "odoo.addons.karage_pos.models.external_order_sync.ExternalOrderSync._process_external_order"
     )
     def test_sync_orders_success(self, mock_process, mock_fetch):
         """Test syncing orders successfully"""
@@ -623,7 +634,7 @@ class TestExternalOrderSync(TransactionCase):
         self.assertEqual(self.sync_config.last_sync_status, "success")
 
     @patch(
-        "karage_pos.models.external_order_sync.ExternalOrderSync._fetch_orders_from_external"
+        "odoo.addons.karage_pos.models.external_order_sync.ExternalOrderSync._fetch_orders_from_external"
     )
     def test_sync_orders_no_orders(self, mock_fetch):
         """Test syncing when no orders returned"""
@@ -634,7 +645,7 @@ class TestExternalOrderSync(TransactionCase):
         self.assertEqual(self.sync_config.last_sync_status, "no_orders")
 
     @patch(
-        "karage_pos.models.external_order_sync.ExternalOrderSync._fetch_orders_from_external"
+        "odoo.addons.karage_pos.models.external_order_sync.ExternalOrderSync._fetch_orders_from_external"
     )
     def test_sync_orders_error(self, mock_fetch):
         """Test syncing when error occurs"""

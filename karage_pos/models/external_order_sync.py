@@ -106,6 +106,25 @@ class ExternalOrderSync(models.Model):
                 # Session is automatically opened by create method
                 _logger.info(f"Created POS session: {session.name}")
                 return session
+            except ValidationError as e:
+                if "Another session is already opened" in str(e):
+                    # Try to find the existing session again
+                    session = (
+                        self.env["pos.session"]
+                        .sudo()
+                        .search(
+                            [
+                                ("config_id", "=", self.pos_config_id.id),
+                                ("state", "=", "opened"),
+                            ],
+                            limit=1,
+                            order="id desc",
+                        )
+                    )
+                    if session:
+                        return session
+                _logger.error(f"Failed to create POS session: {str(e)}")
+                raise UserError(_("Failed to create POS session: %s") % str(e))
             except Exception as e:
                 _logger.error(f"Failed to create POS session: {str(e)}")
                 raise UserError(_("Failed to create POS session: %s") % str(e))
