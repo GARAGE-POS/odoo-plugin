@@ -1,6 +1,6 @@
 [run]
 source = karage-pos
-omit = 
+omit =
     */tests/*
     */__pycache__/*
 

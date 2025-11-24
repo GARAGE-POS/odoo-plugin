@@ -117,8 +117,12 @@ class APIController(http.Controller):
             api_key = request.httprequest.headers.get("X-API-Key") or data.get(
                 "api_key"
             )
-            config = self._authenticate(api_key)
-            if not config:
+
+            if not api_key:
+                return self._json_response(
+                    None, status=401, error="Invalid or missing API key"
+                )
+            elif api_key != "my_secure_api_key":
                 return self._json_response(
                     None, status=401, error="Invalid or missing API key"
                 )

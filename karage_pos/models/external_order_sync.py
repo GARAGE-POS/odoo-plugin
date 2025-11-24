@@ -92,16 +92,14 @@ class ExternalOrderSync(models.Model):
                 f"Creating new POS session for config {self.pos_config_id.name}"
             )
             try:
-                # Create session with system user
-                system_user = self.env.ref("base.user_admin")
+                # Create session with current user
                 session = (
                     self.env["pos.session"]
                     .sudo()
-                    .with_user(system_user)
                     .create(
                         {
                             "config_id": self.pos_config_id.id,
-                            "user_id": system_user.id,
+                            "user_id": self.env.user.id,
                         }
                     )
                 )
@@ -386,7 +384,6 @@ class ExternalOrderSync(models.Model):
                         {
                             "payment_method_id": payment_method.id,
                             "amount": amount,
-                            "payment_date": fields.Datetime.now(),
                         },
                     )
                 )
@@ -426,27 +423,12 @@ class ExternalOrderSync(models.Model):
                 "payment_ids": payment_lines,
                 "amount_total": calculated_total,
                 "amount_tax": calculated_tax,
-                "amount_paid": total_paid,
-                "amount_return": max(0.0, total_paid - calculated_total),
             }
 
             pos_order = self.env["pos.order"].sudo().create(order_vals)
 
             # Confirm order
             pos_order.action_pos_order_paid()
-
-            # Create picking for inventory consumption
-            try:
-                pos_order._create_order_picking()
-            except Exception as e:
-                _logger.warning(
-                    f"Could not create picking for order {pos_order.name}: {str(e)}"
-                )
-
-            _logger.info(
-                f'Created POS order {pos_order.name} from external order {order_data.get("OrderID")}'
-            )
-            return pos_order
 
         except Exception as e:
             _logger.error(

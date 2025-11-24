@@ -120,7 +120,7 @@ odoo --update=karage-pos --addons-path=/mnt/extra-addons --stop-after-init
 
 ```
 karage-pos/
-├── __manifest__.py          # Module metadata and dependencies  
+├── __manifest__.py          # Module metadata and dependencies
 ├── controllers/             # API endpoints
 │   └── order_controller.py  # Main /api/karage/handleOrder endpoint
 ├── models/                  # Business logic and data models

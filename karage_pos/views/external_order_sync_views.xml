@@ -5,18 +5,19 @@
         <record id="view_external_order_sync_tree" model="ir.ui.view">
             <field name="name">external.order.sync.list</field>
             <field name="model">external.order.sync</field>
+            <field name="type">tree</field>
             <field name="arch" type="xml">
-                <list string="External Order Sync">
+                <tree string="External Order Sync">
                     <field name="name"/>
                     <field name="active"/>
                     <field name="pos_config_id"/>
                     <field name="last_sync_date"/>
-                    <field name="last_sync_status" widget="badge" 
+                    <field name="last_sync_status" widget="badge"
                            decoration-success="last_sync_status == 'success'"
                            decoration-warning="last_sync_status == 'no_orders'"
                            decoration-danger="last_sync_status == 'error'"/>
                     <field name="sync_interval"/>
-                </list>
+                </tree>
             </field>
         </record>
 
@@ -38,7 +39,7 @@
                                 <field name="company_id" groups="base.group_multi_company"/>
                             </group>
                             <group>
-                                <field name="pos_config_id" 
+                                <field name="pos_config_id"
                                        options="{'no_create': True, 'no_create_edit': True}"
                                        required="1"/>
                                 <field name="auto_create_session"/>
@@ -47,7 +48,7 @@
                         </group>
                         <group>
                             <group>
-                                <field name="external_api_url" 
+                                <field name="external_api_url"
                                        placeholder="https://external-system.com/api/orders"
                                        required="1"/>
                             </group>
@@ -67,7 +68,7 @@
                                                decoration-danger="last_sync_status == 'error'"/>
                                     </group>
                                     <group>
-                                        <field name="last_sync_message" readonly="1" nolabel="1" 
+                                        <field name="last_sync_message" readonly="1" nolabel="1"
                                                widget="text" placeholder="No sync performed yet"/>
                                     </group>
                                 </group>
@@ -102,4 +103,3 @@
                   sequence="101"/>
     </data>
 </odoo>
-

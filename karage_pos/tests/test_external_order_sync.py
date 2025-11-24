@@ -40,8 +40,10 @@ class TestExternalOrderSync(TransactionCase):
                 "name": "Test POS Config",
                 "payment_method_ids": [(6, 0, [self.cash_payment_method.id])],
                 "company_id": self.company.id,
+                "journal_id": self.cash_journal.id,
             }
         )
+        self.pos_config.pricelist_id = self.env.ref("product.list0")
 
         # Create product
         self.product = self.env["product.product"].create(
@@ -594,10 +596,10 @@ class TestExternalOrderSync(TransactionCase):
         self.assertEqual(pos_order.lines[0].product_id.id, self.product.id)
 
     @patch(
-        "custom_addons.api_integration.models.external_order_sync.ExternalOrderSync._fetch_orders_from_external"
+        "karage_pos.models.external_order_sync.ExternalOrderSync._fetch_orders_from_external"
     )
     @patch(
-        "custom_addons.api_integration.models.external_order_sync.ExternalOrderSync._process_external_order"
+        "karage_pos.models.external_order_sync.ExternalOrderSync._process_external_order"
     )
     def test_sync_orders_success(self, mock_process, mock_fetch):
         """Test syncing orders successfully"""
@@ -614,7 +616,7 @@ class TestExternalOrderSync(TransactionCase):
         self.assertEqual(self.sync_config.last_sync_status, "success")
 
     @patch(
-        "custom_addons.api_integration.models.external_order_sync.ExternalOrderSync._fetch_orders_from_external"
+        "karage_pos.models.external_order_sync.ExternalOrderSync._fetch_orders_from_external"
     )
     def test_sync_orders_no_orders(self, mock_fetch):
         """Test syncing when no orders returned"""
@@ -625,7 +627,7 @@ class TestExternalOrderSync(TransactionCase):
         self.assertEqual(self.sync_config.last_sync_status, "no_orders")
 
     @patch(
-        "custom_addons.api_integration.models.external_order_sync.ExternalOrderSync._fetch_orders_from_external"
+        "karage_pos.models.external_order_sync.ExternalOrderSync._fetch_orders_from_external"
     )
     def test_sync_orders_error(self, mock_fetch):
         """Test syncing when error occurs"""
