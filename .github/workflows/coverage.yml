@@ -85,7 +85,7 @@ jobs:
         
     - name: Install karage-pos module
       run: |
-        python -m odoo --init=karage-pos \
+        python -m odoo --init=karage_pos \
           --database=odoo_test_init \
           --db-filter=odoo_test_init \
           --stop-after-init \
@@ -93,10 +93,10 @@ jobs:
           
     - name: Run tests with coverage
       run: |
-        coverage run --source=karage-pos \
+        coverage run --source=karage_pos \
           --omit="*/tests/*,*/migrations/*,*/__pycache__/*" \
           -m odoo --test-enable \
-          --update=karage-pos \
+          --update=karage_pos \
           --database=odoo_test_coverage \
           --db-filter=odoo_test_coverage \
           --stop-after-init \
