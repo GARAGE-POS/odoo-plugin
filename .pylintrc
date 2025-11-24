@@ -1,0 +1,14 @@
+[MASTER]
+load-plugins=
+jobs=1
+
+[MESSAGES CONTROL]
+disable=C0111,C0103,R0903,R0913,W0613,C0415,R0801,W0511
+
+[FORMAT]
+max-line-length=127
+
+[DESIGN]
+max-args=8
+max-attributes=12
+max-locals=20
