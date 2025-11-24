@@ -33,12 +33,12 @@
         <field name="name">karage.pos.config.list</field>
         <field name="model">karage.pos.config</field>
         <field name="arch" type="xml">
-            <list string="Karage POS Configurations">
+            <tree string="Karage POS Configurations">
                 <field name="name"/>
                 <field name="active"/>
                 <field name="odoo_url"/>
                 <field name="api_key" password="True"/>
-            </list>
+            </tree>
         </field>
     </record>
 
@@ -62,4 +62,3 @@
               action="action_karage_pos_config"
               sequence="100"/>
 </odoo>
-
