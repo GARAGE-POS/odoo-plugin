@@ -35,14 +35,14 @@ RUN apt-get update && \
         liblzma-dev \
         libgdbm-dev \
         python3-pip \
-        python3-dev \        
+        python3-dev \
         libgdbm-compat-dev \
         psmisc \
         libnss3-dev \
         libdb-dev \
         uuid-dev \
         git \
-        wget \        
+        wget \
         ca-certificates \
         curl \
         dirmngr \

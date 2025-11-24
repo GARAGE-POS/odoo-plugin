@@ -9,7 +9,7 @@ on:
 jobs:
   coverage:
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:15
@@ -24,18 +24,18 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0       
-      
+        fetch-depth: 0
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-        
+
     - name: Cache pip dependencies
       uses: actions/cache@v4
       with:
@@ -43,7 +43,7 @@ jobs:
         key: ${{ runner.os }}-odoo-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-odoo-
-          
+
     - name: Install system dependencies
       run: |
         sudo apt-get update
@@ -56,7 +56,7 @@ jobs:
           libjpeg-dev \
           libpq-dev \
           libffi-dev
-          
+
     - name: Install Odoo and dependencies
       run: |
         python -m pip install --upgrade pip
@@ -65,7 +65,7 @@ jobs:
         git clone --depth 1 --branch 17.0 https://github.com/odoo/odoo.git /tmp/odoo
         pip install -r /tmp/odoo/requirements.txt
         pip install -e /tmp/odoo
-        
+
     - name: Prepare Odoo configuration
       run: |
         mkdir -p ~/.local/share/Odoo
@@ -77,14 +77,14 @@ jobs:
         db_user = odoo
         db_password = odoo
         EOF
-        
+
     - name: Wait for PostgreSQL
       run: |
         until pg_isready -h localhost -p 5432 -U odoo; do
           echo "Waiting for PostgreSQL..."
           sleep 2
         done
-        
+
     - name: Install karage-pos module
       run: |
         python -m odoo --init=karage_pos \
@@ -92,7 +92,7 @@ jobs:
           --db-filter=odoo_test_init \
           --stop-after-init \
           --log-level=warn
-          
+
     - name: Run tests with coverage
       run: |
         coverage run --source=karage_pos \
@@ -103,7 +103,7 @@ jobs:
           --db-filter=odoo_test_coverage \
           --stop-after-init \
           --log-level=test
-          
+
     - name: Generate coverage reports
       run: |
         coverage report --show-missing
@@ -113,4 +113,3 @@ jobs:
       uses: SonarSource/sonarqube-scan-action@v6
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        
