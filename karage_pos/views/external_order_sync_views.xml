@@ -7,7 +7,7 @@
             <field name="model">external.order.sync</field>
             <field name="type">tree</field>
             <field name="arch" type="xml">
-                <list string="External Order Sync">
+                <tree string="External Order Sync">
                     <field name="name"/>
                     <field name="active"/>
                     <field name="pos_config_id"/>
@@ -17,7 +17,7 @@
                            decoration-warning="last_sync_status == 'no_orders'"
                            decoration-danger="last_sync_status == 'error'"/>
                     <field name="sync_interval"/>
-                </list>
+                </tree>
             </field>
         </record>
 
