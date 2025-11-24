@@ -77,14 +77,9 @@ class TestExternalOrderSync(TransactionCase):
 
     def tearDown(self):
         super(TestExternalOrderSync, self).tearDown()
-        # Close any open POS sessions created during tests
-        sessions = self.env["pos.session"].sudo().search([("state", "=", "opened")])
-        for session in sessions:
-            try:
-                session.action_pos_session_closing_control()
-            except Exception:
-                # Ignore errors if session can't be closed
-                pass
+        # Delete any POS sessions created during tests to avoid conflicts
+        sessions = self.env["pos.session"].sudo().search([])
+        sessions.unlink()
 
     def test_create_external_order_sync(self):
         """Test creating external order sync"""
@@ -223,15 +218,6 @@ class TestExternalOrderSync(TransactionCase):
 
     def test_process_external_order_success(self):
         """Test processing external order successfully"""
-        # Create session
-        session = self.env["pos.session"].create(
-            {
-                "config_id": self.pos_config.id,
-                "user_id": self.env.user.id,
-            }
-        )
-        session.action_pos_session_open()
-
         order_data = {
             "OrderID": 123,
             "OrderItems": [
@@ -300,14 +286,6 @@ class TestExternalOrderSync(TransactionCase):
     def test_process_external_order_no_payment_methods(self):
         """Test processing order when no payment methods"""
         self.pos_config.payment_method_ids = [(5, 0, 0)]
-
-        session = self.env["pos.session"].create(
-            {
-                "config_id": self.pos_config.id,
-                "user_id": self.env.user.id,
-            }
-        )
-        session.action_pos_session_open()
 
         order_data = {
             "OrderID": 123,
@@ -651,7 +629,8 @@ class TestExternalOrderSync(TransactionCase):
         """Test syncing when error occurs"""
         mock_fetch.side_effect = UserError("Test error")
 
-        self.sync_config.sync_orders()
+        with self.assertRaises(UserError):
+            self.sync_config.sync_orders()
 
         self.assertEqual(self.sync_config.last_sync_status, "error")
         self.assertIn("Test error", self.sync_config.last_sync_message)
