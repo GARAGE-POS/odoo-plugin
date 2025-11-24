@@ -5,6 +5,7 @@
         <record id="view_external_order_sync_tree" model="ir.ui.view">
             <field name="name">external.order.sync.list</field>
             <field name="model">external.order.sync</field>
+            <field name="type">tree</field>
             <field name="arch" type="xml">
                 <list string="External Order Sync">
                     <field name="name"/>
