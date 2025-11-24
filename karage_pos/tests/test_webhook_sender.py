@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from .test_common import KaragePosTestCommon
 

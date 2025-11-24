@@ -91,7 +91,7 @@ class APIController(http.Controller):
         csrf=False,
         cors="*",
     )
-    def webhook_pos_order(self, **kwargs):
+    def webhook_pos_order(self, **kwargs):  # noqa: C901
         """
         Webhook endpoint to create POS order from external system
 
