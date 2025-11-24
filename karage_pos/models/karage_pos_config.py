@@ -19,7 +19,10 @@ class KaragePosConfig(models.Model):
     api_key = fields.Char(
         string="API Key",
         required=True,
-        help="API key to authenticate webhooks sent to Odoo. This key should be included in the X-API-KEY header when sending webhooks.",
+        help=(
+            "API key to authenticate webhooks sent to Odoo. This key should be included "
+            "in the X-API-KEY header when sending webhooks."
+        ),
     )
     active = fields.Boolean(string="Active", default=True)
     odoo_url = fields.Char(

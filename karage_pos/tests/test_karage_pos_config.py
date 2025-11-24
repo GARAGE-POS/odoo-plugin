@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from odoo.tests import TransactionCase
 from odoo.exceptions import ValidationError
 
 from .test_common import KaragePosTestCommon
@@ -83,7 +82,7 @@ class TestKaragePosConfig(KaragePosTestCommon):
 
     def test_multiple_configs_only_one_active(self):
         """Test that only one config should be active"""
-        config2 = self.env["karage.pos.config"].create(
+        self.env["karage.pos.config"].create(
             {
                 "name": "Test Config 2",
                 "api_key": "test_key_2",

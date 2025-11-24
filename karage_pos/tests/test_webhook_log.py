@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import json
-from odoo.tests import TransactionCase
 
 from .test_common import KaragePosTestCommon
 
@@ -122,7 +121,7 @@ class TestWebhookLog(KaragePosTestCommon):
 
     def test_log_order_by_date(self):
         """Test that logs are ordered by receive_date desc"""
-        log1 = self.env["karage.pos.webhook.log"].create_log(
+        self.env["karage.pos.webhook.log"].create_log(
             webhook_body={"OrderID": 1},
         )
 

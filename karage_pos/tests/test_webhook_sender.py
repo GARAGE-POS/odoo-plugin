@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import json
 from unittest.mock import patch, MagicMock
-from odoo.tests import TransactionCase
 
 from .test_common import KaragePosTestCommon
 

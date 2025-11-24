@@ -5,7 +5,6 @@ import logging
 import time
 
 from odoo import fields, http
-from odoo.exceptions import AccessError, ValidationError
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
@@ -402,19 +401,21 @@ class APIController(http.Controller):
                     missing_journals.append(payment_method.name)
 
             if missing_journals:
-                return self._json_response(
+                return self._response(
                     None,
                     status=400,
-                    error=f'Journal not found for payment method(s): {", ".join(missing_journals)}. Please configure journals for all payment methods.',
+                    error=(
+                        f'Journal not found for payment method(s): {", ".join(missing_journals)}. '
+                        "Please configure journals for all payment methods."
+                    ),
                 )
 
             # Validate data consistency
-            amount_total = float(data.get("AmountTotal", 0))
-            amount_paid = float(str(data.get("AmountPaid", 0)).replace(",", ""))
+            amount_paid_str = str(data.get("AmountPaid", 0)).replace(",", "")
+            amount_paid = float(amount_paid_str)
             grand_total = float(data.get("GrandTotal", 0))
             tax = float(data.get("Tax", 0))
             tax_percent = float(data.get("TaxPercent", 0))
-            amount_discount = float(data.get("AmountDiscount", 0))
             balance_amount = float(data.get("BalanceAmount", 0))
 
             # Calculate expected totals from order items
@@ -439,10 +440,13 @@ class APIController(http.Controller):
             rounding = currency.rounding
 
             if abs(calculated_total_with_tax - grand_total) > rounding * 10:
-                return self._json_response(
+                return self._response(
                     None,
                     status=400,
-                    error=f"Data inconsistency: Calculated total ({calculated_total_with_tax}) does not match GrandTotal ({grand_total})",
+                    error=(
+                        f"Data inconsistency: Calculated total ({calculated_total_with_tax}) "
+                        f"does not match GrandTotal ({grand_total})"
+                    ),
                 )
 
             if (
@@ -452,7 +456,10 @@ class APIController(http.Controller):
                 return self._json_response(
                     None,
                     status=400,
-                    error=f"Data inconsistency: AmountPaid ({amount_paid}) + BalanceAmount ({balance_amount}) should equal GrandTotal ({grand_total})",
+                    error=(
+                        f"Data inconsistency: AmountPaid ({amount_paid}) + BalanceAmount ({balance_amount}) "
+                        f"should equal GrandTotal ({grand_total})"
+                    ),
                 )
 
             # Prepare order lines
@@ -462,7 +469,6 @@ class APIController(http.Controller):
             for order_item in data.get("OrderItems", []):
                 item_name = order_item.get("ItemName", "").strip()
                 item_id = order_item.get("ItemID", 0)
-                package_id = order_item.get("PackageID", 0)
                 price = float(order_item.get("Price", 0))
                 quantity = float(order_item.get("Quantity", 1))
                 discount_amount = float(order_item.get("DiscountAmount", 0))
@@ -557,7 +563,6 @@ class APIController(http.Controller):
                         package_item_name = package_item.get("ItemName", "").strip()
                         package_item_id = package_item.get("ItemID", 0)
                         package_qty = float(package_item.get("Quantity", 0))
-                        package_price = float(package_item.get("Price", 0))
 
                         if package_qty > 0:
                             # Find the component product
@@ -608,7 +613,6 @@ class APIController(http.Controller):
                 payment_mode = checkout.get("PaymentMode", 1)
                 amount = float(str(checkout.get("AmountPaid", 0)).replace(",", ""))
                 card_type = checkout.get("CardType", "Cash")
-                reference_id = checkout.get("ReferenceID", "")
 
                 if amount <= 0:
                     continue
@@ -642,13 +646,21 @@ class APIController(http.Controller):
                         return self._json_response(
                             None,
                             status=400,
-                            error=f'Payment method with journal name containing "{journal_search_name}" not found for PaymentMode={payment_mode}. Please configure a payment method with a journal containing "{journal_search_name}" in its name.',
+                            error=(
+                                f'Payment method with journal name containing "{journal_search_name}" '
+                                f"not found for PaymentMode={payment_mode}. Please configure a payment method "
+                                f'with a journal containing "{journal_search_name}" in its name.'
+                            ),
                         )
                     else:
                         return self._json_response(
                             None,
                             status=400,
-                            error=f"No payment method found for PaymentMode={payment_mode}, CardType={card_type}. PaymentMode must be 1 (Cash), 2 (Card), 3 (Credit), 5 (Tabby), 6 (Tamara), 7 (StcPay), or 8 (Bank Transfer).",
+                            error=(
+                                f"No payment method found for PaymentMode={payment_mode}, CardType={card_type}. "
+                                "PaymentMode must be 1 (Cash), 2 (Card), 3 (Credit), 5 (Tabby), 6 (Tamara), "
+                                "7 (StcPay), or 8 (Bank Transfer)."
+                            ),
                         )
 
                 # Validate that payment method has a journal configured
@@ -656,7 +668,10 @@ class APIController(http.Controller):
                     return self._json_response(
                         None,
                         status=400,
-                        error=f"Journal not found for payment method: {payment_method.name}. Please configure a journal for this payment method.",
+                        error=(
+                            f"Journal not found for payment method: {payment_method.name}. "
+                            "Please configure a journal for this payment method."
+                        ),
                     )
 
                 total_paid += amount
@@ -682,7 +697,10 @@ class APIController(http.Controller):
                 return self._json_response(
                     None,
                     status=400,
-                    error=f"Payment inconsistency: Sum of CheckoutDetails ({total_paid}) does not match AmountPaid ({amount_paid})",
+                    error=(
+                        f"Payment inconsistency: Sum of CheckoutDetails ({total_paid}) "
+                        f"does not match AmountPaid ({amount_paid})"
+                    ),
                 )
 
             # Calculate order totals from lines
