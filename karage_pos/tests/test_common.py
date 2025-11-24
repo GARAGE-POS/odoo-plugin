@@ -12,12 +12,8 @@ class KaragePosTestCommon(TransactionCase):
         super().setUpClass()
         cls.env = cls.env(context=dict(cls.env.context, tracking_disable=True))
 
-        # Create test company
-        cls.company = cls.env["res.company"].create(
-            {
-                "name": "Test Company",
-            }
-        )
+        # Use main company
+        cls.company = cls.env.ref("base.main_company")
 
         # Create test user
         cls.user = cls.env["res.users"].create(
@@ -55,7 +51,7 @@ class KaragePosTestCommon(TransactionCase):
         cls.account_receivable = cls.env["account.account"].create(
             {
                 "name": "Test Receivable",
-                "code": "TEST_REC",
+                "code": "TEST.REC",
                 "account_type": "asset_receivable",
                 "company_id": cls.company.id,
             }
@@ -64,7 +60,7 @@ class KaragePosTestCommon(TransactionCase):
         cls.account_cash = cls.env["account.account"].create(
             {
                 "name": "Test Cash",
-                "code": "TEST_CASH",
+                "code": "TEST.CASH",
                 "account_type": "asset_cash",
                 "company_id": cls.company.id,
             }
