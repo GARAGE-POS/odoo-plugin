@@ -17,7 +17,7 @@
                         </group>
                     </group>
                     <group>
-                        <field name="api_key" password="True" placeholder="Enter your API key"/>
+                        <field name="api_key" placeholder="Enter your API key"/>
                     </group>
                     <div class="alert alert-info" role="alert">
                         <p><strong>API Key Configuration:</strong></p>
@@ -37,7 +37,7 @@
                 <field name="name"/>
                 <field name="active"/>
                 <field name="odoo_url"/>
-                <field name="api_key" password="True"/>
+                <field name="api_key"/>
             </list>
         </field>
     </record>
