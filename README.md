@@ -11,7 +11,7 @@
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=GARAGE-POS_odoo-plugin&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=GARAGE-POS_odoo-plugin)
 # Karage POS Odoo Integration
 
-This project provides complete integration between Karage POS systems and Odoo 17 ERP through a custom addon module. The `karage-pos` module processes complete orders from external POS systems into Odoo's standard POS workflow, managing inventory, customers, products, and accounting automatically.
+This project provides complete integration between Karage POS systems and Odoo 18 ERP through a custom addon module. The `karage-pos` module processes complete orders from external POS systems into Odoo's standard POS workflow, managing inventory, customers, products, and accounting automatically.
 
 ## Quick Start
 
@@ -43,7 +43,7 @@ The module extends Odoo's built-in Point of Sale (POS) system to handle external
 ## Prerequisites
 
 ### Local Development
-- Odoo 17 installed and configured
+- Odoo 18 installed and configured
 - System Python with Odoo dependencies
 - Coverage module for testing (optional): `/usr/bin/python3 -m pip install coverage --break-system-packages`
 
@@ -61,11 +61,11 @@ Development containers provide a consistent, isolated environment with all depen
 
 1. **Open in VS Code**: Open the project folder in VS Code
 2. **Reopen in Container**: When prompted, click "Reopen in Container" or use Command Palette (`Ctrl+Shift+P`) → "Dev Containers: Reopen in Container"
-3. **Wait for Setup**: The container will build automatically with Odoo 17 and all dependencies
+3. **Wait for Setup**: The container will build automatically with Odoo 18 and all dependencies
 
 #### DevContainer Benefits
 
-- ✅ **Pre-configured Environment**: Odoo 17, PostgreSQL, and Python dependencies included
+- ✅ **Pre-configured Environment**: Odoo 18, PostgreSQL, and Python dependencies included
 - ✅ **Consistent Development**: Same environment across all developers
 - ✅ **Isolated Dependencies**: No conflicts with local Python installations
 - ✅ **VS Code Integration**: Debugging, extensions, and tools work seamlessly
@@ -92,7 +92,7 @@ python3 -m coverage run -m odoo --test-enable --update=karage-pos --addons-path=
 #### DevContainer Configuration
 
 The development container includes:
-- **Odoo 17**: Pre-installed and configured
+- **Odoo 18**: Pre-installed and configured
 - **PostgreSQL**: Database server ready for use
 - **Python Dependencies**: All required packages installed
 - **VS Code Extensions**: Python, Odoo development extensions
@@ -177,7 +177,7 @@ Sample request payload:
   "CustomerID": 0,
   "OrderDetails": [
     {
-      "ItemID": 170388,
+      "ItemID": 180388,
       "Name": "Fuchs Oil 5W30 Syn Sn",
       "Price": 25,
       "Quantity": 1,
