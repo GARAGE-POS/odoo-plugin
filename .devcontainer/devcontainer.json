@@ -2,6 +2,9 @@
   "name": "Odoo DevContainer",
   "dockerComposeFile": "docker-compose.yaml",
   "service": "odoo",
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {}
+  },
   "workspaceFolder": "/mnt/extra-addons",
   "mounts": [
     "source=${localWorkspaceFolder},target=/mnt/extra-addons,type=bind,consistency=cached"
@@ -9,7 +12,7 @@
   "customizations": {
     "vscode": {
       "settings": {
-        "python.pythonPath": "/usr/bin/python3"
+        "python.defaultInterpreterPath": "/home/odoo/venv/bin/python"
       },
       "extensions": [
         "ms-python.python",
@@ -18,5 +21,6 @@
     }
   },
   "containerUser": "odoo",
-  "remoteUser": "odoo"
+  "remoteUser": "odoo",
+  "postCreateCommand": "python3 -m venv /home/odoo/venv && /home/odoo/venv/bin/pip install --upgrade pip && ([ -f /mnt/extra-addons/requirements.txt ] && /home/odoo/venv/bin/pip install --no-cache-dir -r /mnt/extra-addons/requirements.txt || echo 'No requirements.txt found, skipping...')"
 }
