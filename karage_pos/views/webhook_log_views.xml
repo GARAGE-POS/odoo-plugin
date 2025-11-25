@@ -4,7 +4,7 @@
         <field name="name">karage.pos.webhook.log.list</field>
         <field name="model">karage.pos.webhook.log</field>
         <field name="arch" type="xml">
-            <tree string="Webhook Logs" decoration-success="success == True" decoration-danger="success == False" decoration-warning="status_code == 409">
+            <list string="Webhook Logs" decoration-success="success == True" decoration-danger="success == False" decoration-warning="status_code == 409">
                 <field name="receive_date"/>
                 <field name="order_id"/>
                 <field name="idempotency_key"/>
@@ -12,7 +12,7 @@
                 <field name="success"/>
                 <field name="pos_order_id"/>
                 <field name="processing_time"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -103,3 +103,4 @@
               action="action_webhook_log"
               sequence="102"/>
 </odoo>
+

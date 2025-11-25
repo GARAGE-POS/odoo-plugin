@@ -4,14 +4,14 @@
         <field name="name">karage.pos.webhook.idempotency.list</field>
         <field name="model">karage.pos.webhook.idempotency</field>
         <field name="arch" type="xml">
-            <tree string="Webhook Idempotency Records" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'processing'">
+            <list string="Webhook Idempotency Records" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'processing'">
                 <field name="idempotency_key"/>
                 <field name="order_id"/>
                 <field name="pos_order_id"/>
                 <field name="status"/>
                 <field name="processed_at"/>
                 <field name="create_date"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -64,3 +64,4 @@
               action="action_webhook_idempotency"
               sequence="101"/>
 </odoo>
+

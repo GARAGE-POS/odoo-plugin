@@ -1,11 +1,13 @@
 {
     "name": "Karage POS",
+    "summary": "Integrate Karage POS with Odoo",
     "version": "1.0.0",
     "development_status": "Alpha",
     "category": "Sales",
     "website": "https://karage.co",
     "author": "Karage",
     "maintainers": ["mabumusa1"],
+    "license": "AGPL-3",
     "summary": "REST API endpoints for syncing orders from Karage to Odoo",
     "description": "REST API endpoints for syncing orders from Karage to Odoo",
     "depends": [
@@ -26,4 +28,5 @@
     "installable": True,
     "application": False,
     "auto_install": False,
+    "license": "LGPL-3",
 }

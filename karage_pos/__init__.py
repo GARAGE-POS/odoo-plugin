@@ -1,3 +1,3 @@
 # -*- coding: utf-8 -*-
 
-from . import controllers, models  # noqa: F401
+from . import controllers, models
