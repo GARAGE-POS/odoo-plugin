@@ -93,12 +93,19 @@ jobs:
           --stop-after-init \
           --log-level=warn
 
+    - name: Update karage-pos module
+      run: |
+        python -m odoo --update=karage_pos \
+          --database=odoo_test \
+          --db-filter=odoo_test \
+          --stop-after-init \
+          --log-level=warn
+
     - name: Run tests with coverage
       run: |
         coverage run --source=karage_pos \
           --omit="*/tests/*,*/migrations/*,*/__pycache__/*" \
           -m odoo --test-enable \
-          --update=karage_pos \
           --database=odoo_test \
           --db-filter=odoo_test \
           --stop-after-init \
