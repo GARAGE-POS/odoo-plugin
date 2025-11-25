@@ -24,7 +24,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         """Helper to make webhook request"""
         if headers is None:
             headers = {'X-API-KEY': self.api_key}
-        
+
         if method == 'POST':
             return self.url_open(
                 self.webhook_url,
@@ -55,7 +55,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         except Exception:
             # Expected - route doesn't accept GET
             pass
-        
+
         # OPTIONS request should fail
         try:
             response = self._make_webhook_request({}, method='OPTIONS')
@@ -125,7 +125,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data = self.sample_webhook_data.copy()
         data['OrderItems'][0]['ItemID'] = self.product1.id
         data['OrderItems'][0]['ItemName'] = self.product1.name
-        
+
         response = self._make_webhook_request(data)
         self.assertEqual(response.status_code, 200)
         result = json.loads(response.content)
@@ -133,7 +133,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         self.assertIsNotNone(result['data'])
         self.assertIn('id', result['data'])
         self.assertIn('name', result['data'])
-        
+
         # Verify POS order was created
         pos_order = self.env['pos.order'].browse(result['data']['id'])
         self.assertTrue(pos_order.exists())
@@ -146,7 +146,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
             'X-API-KEY': self.api_key,
             'Idempotency-Key': idempotency_key,
         }
-        
+
         # Ensure data has correct product ID
         data = self.sample_webhook_data.copy()
         data['OrderItems'][0]['ItemID'] = self.product1.id
@@ -165,7 +165,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         
         # Should return same order (duplicate request)
         self.assertEqual(result2['data']['id'], order_id_1)
-        
+
         # Verify only one order was created
         orders = self.env['pos.order'].search([('pos_reference', '=', result1['data']['pos_reference'])])
         self.assertEqual(len(orders), 1)
@@ -177,7 +177,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data['OrderItems'][0]['ItemName'] = self.product1.name
         data['idempotency_key'] = 'body-idempotency-123'
         headers = {'X-API-KEY': self.api_key}
-        
+
         # First request
         response1 = self._make_webhook_request(data, headers=headers)
         self.assertEqual(response1.status_code, 200)
@@ -185,7 +185,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         # Second request
         response2 = self._make_webhook_request(data, headers=headers)
         self.assertEqual(response2.status_code, 200)
-        
+
         # Should return same response
         result1 = json.loads(response1.content)
         result2 = json.loads(response2.content)
@@ -194,15 +194,15 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
     def test_webhook_logging(self):
         """Test that webhooks are logged"""
         initial_count = self.env['karage.pos.webhook.log'].search_count([])
-        
+
         # Ensure data has correct product ID
         data = self.sample_webhook_data.copy()
         data['OrderItems'][0]['ItemID'] = self.product1.id
         data['OrderItems'][0]['ItemName'] = self.product1.name
-        
+
         response = self._make_webhook_request(data)
         self.assertEqual(response.status_code, 200)
-        
+
         # Verify log was created
         logs = self.env['karage.pos.webhook.log'].search([], order='id desc')
         self.assertGreater(len(logs), initial_count)
@@ -268,7 +268,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         })
         
         self.product1.write({'taxes_id': [(6, 0, [tax.id])]})
-        
+
         data = self.sample_webhook_data.copy()
         data['OrderItems'][0]['ItemID'] = self.product1.id
         data['OrderItems'][0]['ItemName'] = self.product1.name
@@ -296,7 +296,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data['AmountTotal'] = 90.0
         data['GrandTotal'] = 90.0
         data['AmountPaid'] = '90.0'
-        
+
         response = self._make_webhook_request(data)
         self.assertEqual(response.status_code, 200)
         result = json.loads(response.content)
@@ -328,7 +328,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data['AmountTotal'] = 250.0
         data['GrandTotal'] = 250.0
         data['AmountPaid'] = '250.0'
-        
+
         response = self._make_webhook_request(data)
         self.assertEqual(response.status_code, 200)
         result = json.loads(response.content)
@@ -356,7 +356,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
             },
         ]
         data['AmountPaid'] = '100.0'
-        
+
         response = self._make_webhook_request(data)
         self.assertEqual(response.status_code, 200)
         result = json.loads(response.content)
@@ -374,7 +374,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data = self.sample_webhook_data.copy()
         data['OrderItems'][0]['ItemID'] = self.product1.id
         data['OrderItems'][0]['ItemName'] = self.product1.name
-        
+
         response = self._make_webhook_request(data)
         self.assertEqual(response.status_code, 400)
         result = json.loads(response.content)
@@ -399,7 +399,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data = self.sample_webhook_data.copy()
         data['OrderItems'][0]['ItemID'] = self.product1.id
         data['OrderItems'][0]['ItemName'] = self.product1.name
-        
+
         # Create a processing idempotency record manually
         self.env['karage.pos.webhook.idempotency'].create({
             'idempotency_key': idempotency_key,
@@ -425,7 +425,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data = self.sample_webhook_data.copy()
         data['OrderItems'][0]['ItemID'] = self.product1.id
         data['OrderItems'][0]['ItemName'] = self.product1.name
-        
+
         # Create a failed idempotency record
         self.env['karage.pos.webhook.idempotency'].create({
             'idempotency_key': idempotency_key,
@@ -444,7 +444,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         """Test webhook with empty order items"""
         data = self.sample_webhook_data.copy()
         data['OrderItems'] = []
-        
+
         response = self._make_webhook_request(data)
         self.assertEqual(response.status_code, 400)
         result = json.loads(response.content)
@@ -457,7 +457,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data['OrderItems'][0]['ItemID'] = self.product1.id
         data['OrderItems'][0]['ItemName'] = self.product1.name
         data['CheckoutDetails'] = []
-        
+
         response = self._make_webhook_request(data)
         self.assertEqual(response.status_code, 400)
         result = json.loads(response.content)
@@ -471,7 +471,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data['OrderItems'][0]['ItemName'] = self.product1.name
         data['AmountPaid'] = '50.0'  # Less than total
         data['CheckoutDetails'][0]['AmountPaid'] = '50.0'
-        
+
         response = self._make_webhook_request(data)
         self.assertEqual(response.status_code, 400)
         result = json.loads(response.content)

@@ -16,7 +16,7 @@ class TestWebhookIdempotency(TransactionCase, KaragePosTestCommon):
             order_id='12345',
             status='pending'
         )
-        
+
         self.assertTrue(record.exists())
         self.assertEqual(record.idempotency_key, 'test-key-123')
         self.assertEqual(record.order_id, '12345')
@@ -26,9 +26,9 @@ class TestWebhookIdempotency(TransactionCase, KaragePosTestCommon):
         """Test that idempotency key must be unique"""
         self.env['karage.pos.webhook.idempotency'].create({
             'idempotency_key': 'unique-key-123',
-            'status': 'pending',
-        })
-        
+                'status': 'pending',
+            })
+
         with self.assertRaises(ValidationError):
             self.env['karage.pos.webhook.idempotency'].create({
                 'idempotency_key': 'unique-key-123',  # Duplicate
@@ -43,11 +43,11 @@ class TestWebhookIdempotency(TransactionCase, KaragePosTestCommon):
             'status': 'completed',
             'order_id': '12345',
         })
-        
+
         # Check for existing key
         found = self.env['karage.pos.webhook.idempotency'].check_idempotency('check-key-123')
         self.assertEqual(found, record)
-        
+
         # Check for non-existent key
         found = self.env['karage.pos.webhook.idempotency'].check_idempotency('non-existent')
         self.assertFalse(found)
@@ -66,7 +66,7 @@ class TestWebhookIdempotency(TransactionCase, KaragePosTestCommon):
             'pricelist_id': self.pos_config.pricelist_id.id,
             'user_id': self.user.id,
         })
-        
+
         record.mark_completed(
             pos_order_id=pos_order,
             response_data='{"id": 1, "name": "TEST"}'
@@ -83,7 +83,7 @@ class TestWebhookIdempotency(TransactionCase, KaragePosTestCommon):
             'idempotency_key': 'fail-key-123',
             'status': 'processing',
         })
-        
+
         record.mark_failed(error_message='Test error message')
         
         self.assertEqual(record.status, 'failed')
@@ -96,7 +96,7 @@ class TestWebhookIdempotency(TransactionCase, KaragePosTestCommon):
             'idempotency_key': 'process-key-123',
             'status': 'pending',
         })
-        
+
         record.mark_processing()
         
         self.assertEqual(record.status, 'processing')
@@ -107,7 +107,7 @@ class TestWebhookIdempotency(TransactionCase, KaragePosTestCommon):
             'idempotency_key': 'existing-key-123',
             'status': 'completed',
         })
-        
+
         # Try to create again with same key
         result = self.env['karage.pos.webhook.idempotency'].create_idempotency_record(
             'existing-key-123',

@@ -12,7 +12,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
     def test_create_log(self):
         """Test creating webhook log"""
         webhook_data = {'OrderID': 123, 'AmountTotal': 100.0}
-        
+
         log = self.env['karage.pos.webhook.log'].create_log(
             webhook_body=webhook_data,
             idempotency_key='log-key-123',
@@ -22,14 +22,14 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
                 'http_method': 'POST',
             }
         )
-        
+
         self.assertTrue(log.exists())
         self.assertEqual(log.idempotency_key, 'log-key-123')
         self.assertEqual(log.order_id, '123')
         self.assertEqual(log.ip_address, '127.0.0.1')
         self.assertEqual(log.user_agent, 'Test Agent')
         self.assertEqual(log.http_method, 'POST')
-        
+
         # Verify webhook body is stored as JSON string
         body_dict = json.loads(log.webhook_body)
         self.assertEqual(body_dict['OrderID'], 123)
@@ -40,7 +40,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
             webhook_body='{"OrderID": 456, "AmountTotal": 200.0}',
             idempotency_key='log-key-456',
         )
-        
+
         self.assertTrue(log.exists())
         body_dict = json.loads(log.webhook_body)
         self.assertEqual(body_dict['OrderID'], 456)
@@ -48,11 +48,11 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
     def test_create_log_extracts_order_id(self):
         """Test that create_log extracts OrderID from body"""
         webhook_data = {'OrderID': 789, 'AmountTotal': 300.0}
-        
+
         log = self.env['karage.pos.webhook.log'].create_log(
             webhook_body=webhook_data,
         )
-        
+
         self.assertEqual(log.order_id, '789')
 
     def test_update_log_result(self):
@@ -60,7 +60,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
         log = self.env['karage.pos.webhook.log'].create_log(
             webhook_body={'OrderID': 999},
         )
-        
+
         pos_order = self.env['pos.order'].create({
             'session_id': self.pos_session.id,
             'config_id': self.pos_config.id,
@@ -73,7 +73,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
             'idempotency_key': 'update-key-123',
             'status': 'completed',
         })
-        
+
         log.update_log_result(
             status_code=200,
             response_message='Success',
@@ -82,7 +82,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
             idempotency_record_id=idempotency_record,
             processing_time=1.5,
         )
-        
+
         self.assertEqual(log.status_code, 200)
         self.assertEqual(log.response_message, 'Success')
         self.assertTrue(log.success)
@@ -95,14 +95,14 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
         log = self.env['karage.pos.webhook.log'].create_log(
             webhook_body={'OrderID': 888},
         )
-        
+
         log.update_log_result(
             status_code=400,
             response_message='Validation error',
             success=False,
             processing_time=0.5,
         )
-        
+
         self.assertEqual(log.status_code, 400)
         self.assertEqual(log.response_message, 'Validation error')
         self.assertFalse(log.success)
@@ -113,7 +113,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
         log = self.env['karage.pos.webhook.log'].create_log(
             webhook_body={'OrderID': 777},
         )
-        
+
         self.assertIsNotNone(log.receive_date)
 
     def test_log_order_by_date(self):
@@ -121,11 +121,11 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
         log1 = self.env['karage.pos.webhook.log'].create_log(
             webhook_body={'OrderID': 1},
         )
-        
+
         log2 = self.env['karage.pos.webhook.log'].create_log(
             webhook_body={'OrderID': 2},
         )
-        
+
         logs = self.env['karage.pos.webhook.log'].search([])
         # Most recent should be first
         self.assertEqual(logs[0], log2)

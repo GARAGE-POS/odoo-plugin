@@ -19,13 +19,13 @@ class TestWebhookSender(TransactionCase, KaragePosTestCommon):
         mock_response.json.return_value = {'status': 'success'}
         mock_response.raise_for_status = MagicMock()
         mock_requests.post.return_value = mock_response
-        
+
         # Update config with URL
         self.karage_config.odoo_url = 'http://test.odoo.com'
-        
+
         webhook_sender = self.env['karage.pos.webhook.sender']
         data = {'OrderID': 123, 'AmountTotal': 100.0}
-        
+
         response = webhook_sender.send_webhook(data)
         
         self.assertIsNotNone(response)
@@ -41,7 +41,7 @@ class TestWebhookSender(TransactionCase, KaragePosTestCommon):
         """Test sending webhook without active config"""
         # Deactivate config
         self.karage_config.active = False
-        
+
         webhook_sender = self.env['karage.pos.webhook.sender']
         response = webhook_sender.send_webhook({'OrderID': 123})
         
@@ -75,9 +75,9 @@ class TestWebhookSender(TransactionCase, KaragePosTestCommon):
         """Test sending webhook with request exception"""
         import requests
         mock_requests.post.side_effect = requests.exceptions.RequestException('Connection error')
-        
+
         self.karage_config.odoo_url = 'http://test.odoo.com'
-        
+
         webhook_sender = self.env['karage.pos.webhook.sender']
         response = webhook_sender.send_webhook({'OrderID': 123})
         
@@ -90,9 +90,9 @@ class TestWebhookSender(TransactionCase, KaragePosTestCommon):
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError('404 Not Found')
         mock_requests.post.return_value = mock_response
-        
+
         self.karage_config.odoo_url = 'http://test.odoo.com'
-        
+
         webhook_sender = self.env['karage.pos.webhook.sender']
         response = webhook_sender.send_webhook({'OrderID': 123})
         
@@ -105,9 +105,9 @@ class TestWebhookSender(TransactionCase, KaragePosTestCommon):
         mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
         mock_requests.post.return_value = mock_response
-        
+
         self.karage_config.odoo_url = 'http://test.odoo.com'
-        
+
         webhook_sender = self.env['karage.pos.webhook.sender']
         webhook_sender.send_webhook({'OrderID': 123}, timeout=60)
         
@@ -123,10 +123,10 @@ class TestWebhookSender(TransactionCase, KaragePosTestCommon):
         mock_requests.post.return_value = mock_response
         
         self.karage_config.odoo_url = 'http://test.odoo.com'
-        
+
         webhook_sender = self.env['karage.pos.webhook.sender']
         order_data = {'OrderID': 456, 'AmountTotal': 200.0}
-        
+
         response = webhook_sender.send_pos_order_webhook(order_data)
         
         self.assertIsNotNone(response)

@@ -18,7 +18,7 @@ class TestKaragePosConfig(TransactionCase, KaragePosTestCommon):
             'odoo_url': 'https://test.odoo.com',
             'webhook_endpoint': '/api/v1/webhook/pos-order',
         })
-        
+
         self.assertTrue(config.exists())
         self.assertEqual(config.name, 'Test Config 2')
         self.assertEqual(config.api_key, 'test_key_456')
@@ -51,7 +51,7 @@ class TestKaragePosConfig(TransactionCase, KaragePosTestCommon):
         """Test get_api_key method"""
         api_key = self.env['karage.pos.config'].get_api_key()
         self.assertEqual(api_key, 'test_api_key_12345')
-        
+
         # Deactivate config
         self.karage_config.active = False
         api_key = self.env['karage.pos.config'].get_api_key()
@@ -61,17 +61,17 @@ class TestKaragePosConfig(TransactionCase, KaragePosTestCommon):
         """Test get_webhook_url method"""
         url = self.karage_config.get_webhook_url()
         self.assertEqual(url, 'http://localhost:8069/api/v1/webhook/pos-order')
-        
+
         # Test with trailing slash in odoo_url
         self.karage_config.odoo_url = 'http://localhost:8069/'
         url = self.karage_config.get_webhook_url()
         self.assertEqual(url, 'http://localhost:8069/api/v1/webhook/pos-order')
-        
+
         # Test with leading slash in endpoint
         self.karage_config.webhook_endpoint = '/api/v1/webhook/pos-order'
         url = self.karage_config.get_webhook_url()
         self.assertEqual(url, 'http://localhost:8069/api/v1/webhook/pos-order')
-        
+
         # Test without odoo_url
         self.karage_config.odoo_url = False
         url = self.karage_config.get_webhook_url()
@@ -84,7 +84,7 @@ class TestKaragePosConfig(TransactionCase, KaragePosTestCommon):
             'api_key': 'test_key_2',
             'active': True,
         })
-        
+
         # Both can be active, but get_config returns the first one found
         config = self.env['karage.pos.config'].get_config()
         self.assertTrue(config)

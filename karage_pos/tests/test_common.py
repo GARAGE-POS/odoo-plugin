@@ -11,12 +11,12 @@ class KaragePosTestCommon(TransactionCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.env = cls.env(context=dict(cls.env.context, tracking_disable=True))
-        
+
         # Create test company
         cls.company = cls.env['res.company'].create({
             'name': 'Test Company',
         })
-        
+
         # Create test user
         cls.user = cls.env['res.users'].create({
             'name': 'Test User',
@@ -24,7 +24,7 @@ class KaragePosTestCommon(TransactionCase):
             'email': 'test@example.com',
             'company_id': cls.company.id,
         })
-        
+
         # Create test products
         cls.product1 = cls.env['product.product'].create({
             'name': 'Test Product 1',
@@ -33,7 +33,7 @@ class KaragePosTestCommon(TransactionCase):
             'available_in_pos': True,
             'list_price': 100.0,
         })
-        
+
         cls.product2 = cls.env['product.product'].create({
             'name': 'Test Product 2',
             'type': 'product',
@@ -41,7 +41,7 @@ class KaragePosTestCommon(TransactionCase):
             'available_in_pos': True,
             'list_price': 50.0,
         })
-        
+
         # Create account for payment methods
         cls.account_receivable = cls.env['account.account'].create({
             'name': 'Test Receivable',
@@ -49,14 +49,14 @@ class KaragePosTestCommon(TransactionCase):
             'account_type': 'asset_receivable',
             'company_id': cls.company.id,
         })
-        
+
         cls.account_cash = cls.env['account.account'].create({
             'name': 'Test Cash',
             'code': 'TEST_CASH',
             'account_type': 'asset_cash',
             'company_id': cls.company.id,
         })
-        
+
         # Create payment journals
         cls.journal_cash = cls.env['account.journal'].create({
             'name': 'Cash',
@@ -65,7 +65,7 @@ class KaragePosTestCommon(TransactionCase):
             'company_id': cls.company.id,
             'default_account_id': cls.account_cash.id,
         })
-        
+
         cls.journal_card = cls.env['account.journal'].create({
             'name': 'Card',
             'type': 'bank',
@@ -73,7 +73,7 @@ class KaragePosTestCommon(TransactionCase):
             'company_id': cls.company.id,
             'default_account_id': cls.account_receivable.id,
         })
-        
+
         # Create POS config
         cls.pos_config = cls.env['pos.config'].create({
             'name': 'Test POS',
@@ -83,14 +83,14 @@ class KaragePosTestCommon(TransactionCase):
                 'company_id': cls.company.id,
             }).id,
         })
-        
+
         # Create payment methods
         cls.payment_method_cash = cls.env['pos.payment.method'].create({
             'name': 'Cash',
             'journal_id': cls.journal_cash.id,
             'is_cash_count': True,
         })
-        
+
         cls.payment_method_card = cls.env['pos.payment.method'].create({
             'name': 'Card',
             'journal_id': cls.journal_card.id,
@@ -99,14 +99,14 @@ class KaragePosTestCommon(TransactionCase):
         cls.pos_config.write({
             'payment_method_ids': [(6, 0, [cls.payment_method_cash.id, cls.payment_method_card.id])],
         })
-        
+
         # Create POS session
         cls.pos_session = cls.env['pos.session'].create({
             'config_id': cls.pos_config.id,
             'user_id': cls.user.id,
         })
         cls.pos_session.action_pos_session_open()
-        
+
         # Create Karage POS config
         cls.karage_config = cls.env['karage.pos.config'].create({
             'name': 'Test Config',
