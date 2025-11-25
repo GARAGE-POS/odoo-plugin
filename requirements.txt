@@ -8,3 +8,4 @@ bandit>=1.7.0
 # Testing tools
 coverage>=7.0.0
 debugpy>=1.8.0
+pre_commit>=3.4.0

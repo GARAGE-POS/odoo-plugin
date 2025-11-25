@@ -1,5 +1,5 @@
 {
-  "name": "Odoo DevContainer",
+  "name": "Python Dev Container",
   "dockerComposeFile": "docker-compose.yaml",
   "service": "odoo",
   "features": {
@@ -12,7 +12,8 @@
   "customizations": {
     "vscode": {
       "settings": {
-        "python.defaultInterpreterPath": "/home/odoo/venv/bin/python"
+        "python.terminal.activateEnvInCurrentTerminal": true,
+        "python.defaultInterpreterPath": "/mnt/extra-addons/.venv/bin/python"
       },
       "extensions": [
         "ms-python.python",
@@ -22,5 +23,5 @@
   },
   "containerUser": "odoo",
   "remoteUser": "odoo",
-  "postCreateCommand": "python3 -m venv /home/odoo/venv && /home/odoo/venv/bin/pip install --upgrade pip && ([ -f /mnt/extra-addons/requirements.txt ] && /home/odoo/venv/bin/pip install --no-cache-dir -r /mnt/extra-addons/requirements.txt || echo 'No requirements.txt found, skipping...')"
+  "postCreateCommand": "python3 -m venv /mnt/extra-addons/.venv && /mnt/extra-addons/.venv/bin/pip install --upgrade pip && ([ -f /mnt/extra-addons/requirements.txt ] && /mnt/extra-addons/.venv/bin/pip install --no-cache-dir -r /mnt/extra-addons/requirements.txt || echo 'No requirements.txt found, skipping...') && echo 'if [ -f /mnt/extra-addons/.venv/bin/activate ]; then source /mnt/extra-addons/.venv/bin/activate; fi' >> /home/odoo/.bashrc"
 }
