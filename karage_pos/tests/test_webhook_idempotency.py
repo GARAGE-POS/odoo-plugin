@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from odoo.tests import TransactionCase
 from odoo.exceptions import ValidationError
+from odoo.tests import TransactionCase
 
 from .test_common import KaragePosTestCommon
 

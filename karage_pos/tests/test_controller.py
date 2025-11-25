@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import json
+
 from odoo.tests import HttpCase
 from odoo.tests.common import tagged
 
