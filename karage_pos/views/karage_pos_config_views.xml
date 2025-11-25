@@ -37,7 +37,7 @@
                 <field name="name"/>
                 <field name="active"/>
                 <field name="odoo_url"/>
-                <field name="api_key"/>
+                <field name="api_key" password="True"/>
             </list>
         </field>
     </record>
