@@ -4,14 +4,14 @@
         <field name="name">karage.pos.webhook.idempotency.list</field>
         <field name="model">karage.pos.webhook.idempotency</field>
         <field name="arch" type="xml">
-            <list string="Webhook Idempotency Records" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'processing'">
+            <tree string="Webhook Idempotency Records" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'processing'">
                 <field name="idempotency_key"/>
                 <field name="order_id"/>
                 <field name="pos_order_id"/>
                 <field name="status"/>
                 <field name="processed_at"/>
                 <field name="create_date"/>
-            </list>
+            </tree>
         </field>
     </record>
 
@@ -47,7 +47,7 @@
     <record id="action_webhook_idempotency" model="ir.actions.act_window">
         <field name="name">Webhook Idempotency</field>
         <field name="res_model">karage.pos.webhook.idempotency</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">tree,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No idempotency records yet
