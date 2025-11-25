@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_webhook_log_list" model="ir.ui.view">
+        <field name="name">karage.pos.webhook.log.list</field>
+        <field name="model">karage.pos.webhook.log</field>
+        <field name="arch" type="xml">
+            <list string="Webhook Logs" decoration-success="success == True" decoration-danger="success == False" decoration-warning="status_code == 409">
+                <field name="receive_date"/>
+                <field name="order_id"/>
+                <field name="idempotency_key"/>
+                <field name="status_code"/>
+                <field name="success"/>
+                <field name="pos_order_id"/>
+                <field name="processing_time"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_webhook_log_form" model="ir.ui.view">
+        <field name="name">karage.pos.webhook.log.form</field>
+        <field name="model">karage.pos.webhook.log</field>
+        <field name="arch" type="xml">
+            <form string="Webhook Log">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="receive_date" readonly="1"/>
+                            <field name="order_id"/>
+                            <field name="idempotency_key"/>
+                            <field name="success"/>
+                        </group>
+                        <group>
+                            <field name="status_code"/>
+                            <field name="http_method"/>
+                            <field name="ip_address"/>
+                            <field name="processing_time"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Webhook Body" name="webhook_body">
+                            <field name="webhook_body" readonly="1" nolabel="1" widget="text"/>
+                        </page>
+                        <page string="Response" name="response">
+                            <field name="response_message" readonly="1" nolabel="1" widget="text"/>
+                        </page>
+                        <page string="Details" name="details">
+                            <group>
+                                <group>
+                                    <field name="user_agent" readonly="1"/>
+                                    <field name="pos_order_id" readonly="1"/>
+                                    <field name="idempotency_record_id" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_webhook_log_search" model="ir.ui.view">
+        <field name="name">karage.pos.webhook.log.search</field>
+        <field name="model">karage.pos.webhook.log</field>
+        <field name="arch" type="xml">
+            <search string="Webhook Logs">
+                <field name="order_id"/>
+                <field name="idempotency_key"/>
+                <field name="ip_address"/>
+                <field name="pos_order_id"/>
+                <filter string="Successful" name="successful" domain="[('success', '=', True)]"/>
+                <filter string="Failed" name="failed" domain="[('success', '=', False)]"/>
+                <filter string="Today" name="today" domain="[('receive_date', '>=', datetime.datetime.now().replace(hour=0, minute=0, second=0))]"/>
+                <separator/>
+                <filter string="This Week" name="this_week" domain="[('receive_date', '>=', (datetime.datetime.now() - datetime.timedelta(days=7)))]"/>
+                <filter string="This Month" name="this_month" domain="[('receive_date', '>=', (datetime.datetime.now() - datetime.timedelta(days=30)))]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Receive Date" name="group_by_receive_date" context="{'group_by': 'receive_date'}"/>
+                    <filter string="Status Code" name="group_by_status_code" context="{'group_by': 'status_code'}"/>
+                    <filter string="Success" name="group_by_success" context="{'group_by': 'success'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_webhook_log" model="ir.actions.act_window">
+        <field name="name">Webhook Logs</field>
+        <field name="res_model">karage.pos.webhook.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_webhook_log_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No webhook logs yet
+            </p>
+            <p>
+                All incoming webhook requests are logged here with their body, receive date, and idempotency key.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_webhook_log"
+              name="Webhook Logs"
+              parent="point_of_sale.menu_point_ofsale"
+              action="action_webhook_log"
+              sequence="102"/>
+</odoo>
+

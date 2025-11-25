@@ -1,6 +1,6 @@
 {
     "name": "Karage POS",
-    "summary": "Integrate Karage POS with Odoo",
+    "summary": "REST API endpoints for syncing orders from Karage o Odoo",
     "version": "1.0.0",
     "development_status": "Alpha",
     "category": "Sales",
@@ -8,7 +8,6 @@
     "author": "Karage",
     "maintainers": ["mabumusa1"],
     "license": "AGPL-3",
-    "summary": "REST API endpoints for syncing orders from Karage to Odoo",
     "description": "REST API endpoints for syncing orders from Karage to Odoo",
     "depends": [
         "base",
@@ -18,9 +17,14 @@
         "account",
         "stock",
     ],
-    "data": ["security/ir.model.access.csv", "views/external_order_sync_views.xml"],
+    "data": [
+        "security/ir.model.access.csv",
+        "views/karage_pos_config_views.xml",
+        "views/pos_order_views.xml",
+        "views/webhook_idempotency_views.xml",
+        "views/webhook_log_views.xml",
+    ],
     "installable": True,
     "application": False,
-    "auto_install": False,
-    "license": "LGPL-3",
+    "auto_install": False
 }

@@ -2,6 +2,11 @@
 
 set -e
 
+# Activate virtual environment
+if [ -f /home/odoo/venv/bin/activate ]; then
+    source /home/odoo/venv/bin/activate
+fi
+
 echo "[entrypoint] Fixing ownership of /mnt/extra-addons..."
 sudo chown -R odoo:odoo /mnt/extra-addons 2>/dev/null || true
 
