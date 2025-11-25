@@ -88,8 +88,8 @@ jobs:
     - name: Install karage-pos module
       run: |
         python -m odoo --init=karage_pos \
-          --database=odoo_test_init \
-          --db-filter=odoo_test_init \
+          --database=odoo_test \
+          --db-filter=odoo_test \
           --stop-after-init \
           --log-level=warn
 
@@ -99,8 +99,8 @@ jobs:
           --omit="*/tests/*,*/migrations/*,*/__pycache__/*" \
           -m odoo --test-enable \
           --update=karage_pos \
-          --database=odoo_test_init \
-          --db-filter=odoo_test_init \
+          --database=odoo_test \
+          --db-filter=odoo_test \
           --stop-after-init \
           --log-level=test
 
