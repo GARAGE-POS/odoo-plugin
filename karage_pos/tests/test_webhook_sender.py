@@ -20,8 +20,8 @@ class TestWebhookSender(TransactionCase, KaragePosTestCommon):
         mock_response.raise_for_status = MagicMock()
         mock_requests.post.return_value = mock_response
 
-        # Update config with URL
-        self.karage_config.odoo_url = 'http://test.odoo.com'
+        # Set base URL
+        self.env['ir.config_parameter'].sudo().set_param('web.base.url', 'http://test.odoo.com')
 
         webhook_sender = self.env['karage.pos.webhook.sender']
         data = {'OrderID': 123, 'AmountTotal': 100.0}
@@ -37,38 +37,19 @@ class TestWebhookSender(TransactionCase, KaragePosTestCommon):
         self.assertEqual(call_args[1]['headers']['X-API-KEY'], 'test_api_key_12345')
 
     @patch('karage_pos.models.webhook_sender.requests')
-    def test_send_webhook_no_config(self, mock_requests):
-        """Test sending webhook without active config"""
-        # Deactivate config
-        self.karage_config.active = False
-
-        webhook_sender = self.env['karage.pos.webhook.sender']
-        response = webhook_sender.send_webhook({'OrderID': 123})
-        
-        self.assertIsNone(response)
-        mock_requests.post.assert_not_called()
-
-    @patch('karage_pos.models.webhook_sender.requests')
     def test_send_webhook_no_api_key(self, mock_requests):
         """Test sending webhook without API key"""
-        self.karage_config.api_key = False
+        # Remove API key
+        self.env['ir.config_parameter'].sudo().set_param('karage_pos.api_key', False)
         
         webhook_sender = self.env['karage.pos.webhook.sender']
         response = webhook_sender.send_webhook({'OrderID': 123})
         
         self.assertIsNone(response)
         mock_requests.post.assert_not_called()
-
-    @patch('karage_pos.models.webhook_sender.requests')
-    def test_send_webhook_no_url(self, mock_requests):
-        """Test sending webhook without Odoo URL"""
-        self.karage_config.odoo_url = False
         
-        webhook_sender = self.env['karage.pos.webhook.sender']
-        response = webhook_sender.send_webhook({'OrderID': 123})
-        
-        self.assertIsNone(response)
-        mock_requests.post.assert_not_called()
+        # Restore API key for other tests
+        self.env['ir.config_parameter'].sudo().set_param('karage_pos.api_key', 'test_api_key_12345')
 
     @patch('karage_pos.models.webhook_sender.requests')
     def test_send_webhook_request_exception(self, mock_requests):
@@ -76,7 +57,7 @@ class TestWebhookSender(TransactionCase, KaragePosTestCommon):
         import requests
         mock_requests.post.side_effect = requests.exceptions.RequestException('Connection error')
 
-        self.karage_config.odoo_url = 'http://test.odoo.com'
+        self.env['ir.config_parameter'].sudo().set_param('web.base.url', 'http://test.odoo.com')
 
         webhook_sender = self.env['karage.pos.webhook.sender']
         response = webhook_sender.send_webhook({'OrderID': 123})
@@ -91,7 +72,7 @@ class TestWebhookSender(TransactionCase, KaragePosTestCommon):
         mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError('404 Not Found')
         mock_requests.post.return_value = mock_response
 
-        self.karage_config.odoo_url = 'http://test.odoo.com'
+        self.env['ir.config_parameter'].sudo().set_param('web.base.url', 'http://test.odoo.com')
 
         webhook_sender = self.env['karage.pos.webhook.sender']
         response = webhook_sender.send_webhook({'OrderID': 123})
@@ -106,7 +87,7 @@ class TestWebhookSender(TransactionCase, KaragePosTestCommon):
         mock_response.raise_for_status = MagicMock()
         mock_requests.post.return_value = mock_response
 
-        self.karage_config.odoo_url = 'http://test.odoo.com'
+        self.env['ir.config_parameter'].sudo().set_param('web.base.url', 'http://test.odoo.com')
 
         webhook_sender = self.env['karage.pos.webhook.sender']
         webhook_sender.send_webhook({'OrderID': 123}, timeout=60)
@@ -122,7 +103,7 @@ class TestWebhookSender(TransactionCase, KaragePosTestCommon):
         mock_response.raise_for_status = MagicMock()
         mock_requests.post.return_value = mock_response
         
-        self.karage_config.odoo_url = 'http://test.odoo.com'
+        self.env['ir.config_parameter'].sudo().set_param('web.base.url', 'http://test.odoo.com')
 
         webhook_sender = self.env['karage.pos.webhook.sender']
         order_data = {'OrderID': 456, 'AmountTotal': 200.0}

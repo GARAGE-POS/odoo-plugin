@@ -197,15 +197,15 @@ class APIController(http.Controller):
                 )
             
             # Get configured API key from settings
-            config = request.env["karage.pos.config"].sudo().get_config()
-            if not config or not config.api_key:
+            configured_api_key = request.env['ir.config_parameter'].sudo().get_param('karage_pos.api_key')
+            if not configured_api_key:
                 _logger.error("Karage POS API key not configured in settings")
                 return self._json_response(
                     None, status=500, error="API key not configured in system settings"
                 )
             
             # Validate API key
-            if api_key != config.api_key:
+            if api_key != configured_api_key:
                 _logger.warning(f"Invalid API key attempt: {api_key[:10]}...")
                 if webhook_log:
                     webhook_log.update_log_result(

@@ -28,25 +28,20 @@ class WebhookSender(models.AbstractModel):
             _logger.error('requests library not available. Cannot send webhook.')
             return None
         
-        config = self.env['karage.pos.config'].get_config()
+        api_key = self.env['ir.config_parameter'].sudo().get_param('karage_pos.api_key')
         
-        if not config:
-            _logger.error('No active Karage POS configuration found. Cannot send webhook.')
-            return None
-        
-        if not config.api_key:
+        if not api_key:
             _logger.error('API key not configured. Cannot send webhook.')
             return None
         
-        if not config.odoo_url:
-            _logger.error('Odoo URL not configured. Cannot send webhook.')
-            return None
-        
-        webhook_url = config.get_webhook_url()
+        # Get base URL from system parameter or use request base URL
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', 'http://localhost:8069')
+        webhook_endpoint = '/api/v1/webhook/pos-order'
+        webhook_url = f"{base_url.rstrip('/')}/{webhook_endpoint.lstrip('/')}"
         
         headers = {
             'Content-Type': 'application/json',
-            'X-API-KEY': config.api_key,
+            'X-API-KEY': api_key,
         }
         
         try:
