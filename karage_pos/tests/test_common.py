@@ -133,7 +133,7 @@ class KaragePosTestCommon:
         # Set Karage POS API key in system parameters
         cls.env['ir.config_parameter'].sudo().set_param('karage_pos.api_key', 'test_api_key_12345')
         cls.api_key = 'test_api_key_12345'
-        
+
         # Sample webhook data
         cls.sample_webhook_data = {
             "OrderID": 12345,

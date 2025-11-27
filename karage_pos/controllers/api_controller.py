@@ -67,7 +67,7 @@ class APIController(http.Controller):
             return None
 
     def _update_log(self, webhook_log, status_code, message, success=False,
-                   pos_order=None, idempotency_record=None, start_time=None):
+                    pos_order=None, idempotency_record=None, start_time=None):
         """Update webhook log with processing result"""
         if not webhook_log:
             return
@@ -85,7 +85,7 @@ class APIController(http.Controller):
             _logger.warning(f"Error updating webhook log: {str(e)}")
 
     def _error_response(self, status, error_msg, webhook_log=None,
-                       idempotency_record=None, start_time=None):
+                        idempotency_record=None, start_time=None):
         """
         Create error response and update logs
 
@@ -105,7 +105,7 @@ class APIController(http.Controller):
 
         # Update webhook log
         self._update_log(webhook_log, status, error_msg, False,
-                        idempotency_record=idempotency_record, start_time=start_time)
+                         idempotency_record=idempotency_record, start_time=start_time)
 
         # Return JSON response
         return self._json_response(None, status=status, error=error_msg)
