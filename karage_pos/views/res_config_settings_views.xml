@@ -54,6 +54,22 @@ Content-Type: application/json</pre>
                             </div>
                         </setting>
                     </block>
+                    <block title="Bulk Sync Configuration" name="karage_pos_bulk_sync_config">
+                        <setting string="Maximum Orders per Bulk Request" name="bulk_sync_max_orders_setting">
+                            <field name="bulk_sync_max_orders"/>
+                            <div class="text-muted">
+                                Maximum number of orders allowed in a single bulk sync request. Default: 1000 orders.
+                            </div>
+                        </setting>
+                    </block>
+                    <block title="Order Validation" name="karage_pos_order_validation">
+                        <setting string="Valid Order Statuses" name="valid_order_statuses_setting">
+                            <field name="valid_order_statuses"/>
+                            <div class="text-muted">
+                                Comma-separated list of valid OrderStatus values (e.g., "103,104"). Only orders with these status codes will be accepted.
+                            </div>
+                        </setting>
+                    </block>
                 </app>
             </xpath>
         </field>

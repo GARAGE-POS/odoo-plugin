@@ -51,15 +51,17 @@ class APIController(http.Controller):
     def _create_webhook_log(self, body_data, idempotency_key=None):
         """Create webhook log entry"""
         try:
-            return request.env["karage.pos.webhook.log"].sudo().create_log(
-                webhook_body=body_data,
-                idempotency_key=idempotency_key,
-                request_info={
-                    "ip_address": request.httprequest.remote_addr,
-                    "user_agent": request.httprequest.headers.get("User-Agent"),
-                    "http_method": request.httprequest.method,
-                },
-            )
+            # Use savepoint to isolate potential duplicate key errors
+            with request.env.cr.savepoint():
+                return request.env["karage.pos.webhook.log"].sudo().create_log(
+                    webhook_body=body_data,
+                    idempotency_key=idempotency_key,
+                    request_info={
+                        "ip_address": request.httprequest.remote_addr,
+                        "user_agent": request.httprequest.headers.get("User-Agent"),
+                        "http_method": request.httprequest.method,
+                    },
+                )
         except Exception as e:
             _logger.warning(f"Failed to create webhook log: {str(e)}")
             return None
@@ -364,6 +366,185 @@ class APIController(http.Controller):
                 webhook_log, idempotency_record, start_time
             )
 
+    @http.route(
+        "/api/v1/webhook/pos-order/bulk",
+        type="http",
+        auth="none",
+        methods=["POST"],
+        csrf=False,
+        cors="*",
+    )
+    def webhook_pos_order_bulk(self, **kwargs):
+        """
+        Bulk webhook endpoint to create multiple POS orders
+
+        Expected JSON format:
+        {
+            "orders": [
+                { /* order 1 data */ },
+                { /* order 2 data */ },
+                ...
+            ]
+        }
+
+        Returns HTTP 200 if all succeed
+        Returns HTTP 207 (Multi-Status) if partial success
+        Returns HTTP 400 if all fail
+        """
+        start_time = time.time()
+        webhook_log = None
+
+        try:
+            # 1. Validate HTTP method
+            if request.httprequest.method != "POST":
+                return self._json_response(
+                    None, status=405, error="Method not allowed. Only POST requests are accepted."
+                )
+
+            # 2. Parse request body
+            data, error = self._parse_request_body()
+            if error:
+                return self._json_response(None, status=400, error=error)
+
+            # 3. Extract API key
+            api_key = self._get_header_or_body(data, "X-API-KEY", "X-API-Key", "api_key")
+
+            # 4. Create webhook log
+            webhook_log = self._create_webhook_log(data)
+
+            # 5. Authenticate API key
+            authenticated, auth_error = self._authenticate_api_key(api_key)
+            if not authenticated:
+                self._update_log(webhook_log, 401, auth_error, False, start_time=start_time)
+                return self._json_response(None, status=401, error=auth_error)
+
+            # 6. Validate required fields
+            if "orders" not in data:
+                error_msg = 'Missing required field: "orders"'
+                self._update_log(webhook_log, 400, error_msg, False, start_time=start_time)
+                return self._json_response(None, status=400, error=error_msg)
+
+            orders_data = data.get("orders", [])
+            if not isinstance(orders_data, list):
+                error_msg = '"orders" must be an array'
+                self._update_log(webhook_log, 400, error_msg, False, start_time=start_time)
+                return self._json_response(None, status=400, error=error_msg)
+
+            # 7. Check bulk size limit
+            max_orders = int(
+                request.env["ir.config_parameter"]
+                .sudo()
+                .get_param("karage_pos.bulk_sync_max_orders", default="1000")
+            )
+            if len(orders_data) > max_orders:
+                error_msg = f"Too many orders: {len(orders_data)}. Maximum allowed: {max_orders}"
+                self._update_log(webhook_log, 400, error_msg, False, start_time=start_time)
+                return self._json_response(None, status=400, error=error_msg)
+
+            # 8. Process orders
+            results = self._process_bulk_orders(orders_data)
+
+            # 9. Determine overall status
+            total = len(results)
+            successful = sum(1 for r in results if r["status"] == "success")
+            failed = total - successful
+
+            if successful == total:
+                status_code = 200
+                status_text = "success"
+            elif successful == 0:
+                status_code = 400
+                status_text = "error"
+            else:
+                status_code = 207  # Multi-Status
+                status_text = "partial_success"
+
+            # 10. Prepare response
+            response_data = {
+                "total": total,
+                "successful": successful,
+                "failed": failed,
+                "results": results,
+            }
+
+            # 11. Update webhook log
+            processing_time = time.time() - start_time
+            self._update_log(
+                webhook_log,
+                status_code,
+                json.dumps(response_data),
+                successful > 0,
+                start_time=start_time,
+            )
+
+            return self._json_response(
+                response_data,
+                status=status_code if status_code == 200 else 200,  # Always return 200, status in data
+            )
+
+        except Exception as e:
+            _logger.error(f"Unexpected error in webhook_pos_order_bulk: {str(e)}", exc_info=True)
+            if webhook_log:
+                self._update_log(
+                    webhook_log, 500, f"Internal server error: {str(e)}", False, start_time=start_time
+                )
+            return self._json_response(None, status=500, error=f"Internal server error: {str(e)}")
+
+    def _process_bulk_orders(self, orders_data):
+        """
+        Process multiple orders independently
+
+        :param orders_data: List of order data dicts
+        :return: List of result dicts, one per order
+        """
+        results = []
+
+        for idx, order_data in enumerate(orders_data):
+            order_id = order_data.get("OrderID", f"unknown_{idx}")
+
+            try:
+                # Use savepoint for atomic per-order processing
+                with request.env.cr.savepoint():
+                    # Validate required fields for this order
+                    required_fields = ["OrderID", "OrderItems", "CheckoutDetails", "AmountTotal", "AmountPaid"]
+                    missing_fields = [field for field in required_fields if field not in order_data]
+
+                    if missing_fields:
+                        results.append({
+                            "external_order_id": order_id,
+                            "status": "error",
+                            "error": f'Missing required fields: {", ".join(missing_fields)}'
+                        })
+                        continue
+
+                    # Process the order
+                    pos_order, order_error = self._process_pos_order(order_data)
+
+                    if order_error:
+                        results.append({
+                            "external_order_id": order_id,
+                            "status": "error",
+                            "error": order_error.get("message", "Unknown error")
+                        })
+                    else:
+                        results.append({
+                            "external_order_id": order_id,
+                            "status": "success",
+                            "pos_order_id": pos_order.id,
+                            "pos_order_name": pos_order.name,
+                            "amount_total": pos_order.amount_total,
+                        })
+
+            except Exception as e:
+                _logger.error(f"Error processing order {order_id}: {str(e)}", exc_info=True)
+                results.append({
+                    "external_order_id": order_id,
+                    "status": "error",
+                    "error": str(e)
+                })
+
+        return results
+
     def _process_pos_order(self, data):
         """
         Process POS order from webhook data
@@ -372,17 +553,13 @@ class APIController(http.Controller):
         :return: Tuple of (pos_order, error_dict or None)
         """
         try:
-            # Get open POS session
-            pos_session = (
-                request.env["pos.session"]
-                .sudo()
-                .search([("state", "=", "opened")], limit=1, order="id desc")
-            )
+            # Get or create POS session for external sync
+            pos_session = self._get_or_create_external_session()
 
             if not pos_session:
                 return None, {
                     "status": 400,
-                    "message": "No open POS session found. Please open a POS session first."
+                    "message": "No POS configuration found for external sync. Please configure a POS for webhook integration."
                 }
 
             # Validate payment methods
@@ -401,6 +578,47 @@ class APIController(http.Controller):
                     "status": 400,
                     "message": f'Journal not found for payment method(s): {", ".join(missing_journals)}'
                 }
+
+            # Check for duplicate external order ID
+            external_order_id = str(data.get("OrderID", ""))
+            if external_order_id:
+                existing = request.env["pos.order"].sudo().search([
+                    ("external_order_id", "=", external_order_id),
+                    ("external_order_source", "=", "karage_pos_webhook"),
+                ], limit=1)
+                if existing:
+                    return None, {
+                        "status": 400,
+                        "message": f"Duplicate order: OrderID {external_order_id} already exists as {existing.name}"
+                    }
+
+            # Validate OrderStatus (only accept completed orders)
+            order_status = data.get("OrderStatus")
+            if order_status is not None:
+                # Get valid statuses from config (default to 103)
+                valid_statuses_str = request.env["ir.config_parameter"].sudo().get_param(
+                    "karage_pos.valid_order_statuses", "103"
+                )
+                valid_statuses = [int(s.strip()) for s in valid_statuses_str.split(",") if s.strip().isdigit()]
+
+                if order_status not in valid_statuses:
+                    return None, {
+                        "status": 400,
+                        "message": f"Invalid OrderStatus: {order_status}. Only completed orders ({', '.join(map(str, valid_statuses))}) are accepted."
+                    }
+
+            # Parse OrderDate from payload (use external timestamp)
+            from datetime import datetime
+            order_date = data.get("OrderDate")
+            if order_date:
+                try:
+                    # Handle ISO format with or without timezone
+                    order_datetime = datetime.fromisoformat(order_date.replace('Z', '+00:00'))
+                except (ValueError, AttributeError):
+                    _logger.warning(f"Could not parse OrderDate: {order_date}. Using current time.")
+                    order_datetime = fields.Datetime.now()
+            else:
+                order_datetime = fields.Datetime.now()
 
             # Parse amounts
             amount_paid = float(str(data.get("AmountPaid", 0)).replace(",", ""))
@@ -463,7 +681,7 @@ class APIController(http.Controller):
                     else False
                 ),
                 "user_id": pos_session.user_id.id,
-                "date_order": fields.Datetime.now(),
+                "date_order": order_datetime,  # Use external timestamp
                 "partner_id": False,
                 "to_invoice": False,
                 "general_note": f'External Order ID: {data.get("OrderID")}',
@@ -473,6 +691,10 @@ class APIController(http.Controller):
                 "amount_tax": final_tax,
                 "amount_paid": total_paid,
                 "amount_return": max(0.0, total_paid - final_total),
+                # External order tracking fields
+                "external_order_id": external_order_id,
+                "external_order_source": "karage_pos_webhook",
+                "external_order_date": order_datetime,
             }
 
             pos_order = request.env["pos.order"].sudo().create(order_vals)
@@ -513,44 +735,230 @@ class APIController(http.Controller):
 
         return calculated_total_with_tax, calculated_tax if tax_percent > 0 else tax
 
+    def _get_or_create_external_session(self):
+        """
+        Get or create a POS session for external webhook integration
+
+        Strategy:
+        1. Look for an open session for a POS config with 'External' or 'Webhook' in the name
+        2. If no open session found, look for the newest POS config for external sync
+        3. Create a new session if needed
+        4. Return the session
+
+        :return: pos.session record or None
+        """
+        pos_session_env = request.env["pos.session"].sudo()
+        pos_config_env = request.env["pos.config"].sudo()
+
+        # 1. Try to find an open session for external sync
+        # Look for POS config with 'External', 'Webhook', 'API', or 'Integration' in the name
+        # Check for both 'opened' and 'opening_control' states
+        pos_session = pos_session_env.search([
+            ("state", "in", ["opened", "opening_control"]),
+            "|", "|", "|",
+            ("config_id.name", "ilike", "external"),
+            ("config_id.name", "ilike", "webhook"),
+            ("config_id.name", "ilike", "api"),
+            ("config_id.name", "ilike", "integration"),
+        ], limit=1, order="id desc")
+
+        if pos_session:
+            _logger.info(f"Using existing external POS session: {pos_session.name}")
+            return pos_session
+
+        # 2. If no open session, find the POS config for external sync
+        pos_config = pos_config_env.search([
+            "|", "|", "|",
+            ("name", "ilike", "external"),
+            ("name", "ilike", "webhook"),
+            ("name", "ilike", "api"),
+            ("name", "ilike", "integration"),
+        ], limit=1, order="id desc")
+
+        # 3. If no dedicated external config, try to use any available POS config
+        if not pos_config:
+            _logger.warning("No dedicated external POS config found. Looking for any POS config...")
+            pos_config = pos_config_env.search([], limit=1, order="id desc")
+
+        if not pos_config:
+            _logger.error("No POS configuration found in the system")
+            return None
+
+        # 4. Check if there's already an open session for this config
+        # Check for both 'opened' and 'opening_control' states
+        existing_session = pos_session_env.search([
+            ("config_id", "=", pos_config.id),
+            ("state", "in", ["opened", "opening_control"]),
+        ], limit=1)
+
+        if existing_session:
+            _logger.info(f"Found existing open session for config {pos_config.name}: {existing_session.name}")
+            return existing_session
+
+        # 5. Create a new session for external sync
+        try:
+            _logger.info(f"Creating new POS session for external sync using config: {pos_config.name}")
+            new_session = pos_session_env.create({
+                "config_id": pos_config.id,
+                "user_id": request.env.user.id,
+            })
+
+            # Open the session
+            new_session.action_pos_session_open()
+            _logger.info(f"Successfully created and opened POS session: {new_session.name}")
+            return new_session
+
+        except Exception as e:
+            _logger.error(f"Failed to create POS session for external sync: {str(e)}", exc_info=True)
+            return None
+
+    def _find_product_by_id(self, odoo_item_id, item_id, item_name, pos_session):
+        """
+        Find product by OdooItemID (preferred), ItemID, or ItemName
+
+        Priority order:
+        1. OdooItemID (direct product_id)
+        2. ItemID (legacy support)
+        3. ItemName (exact match)
+        4. ItemName (fuzzy match with warning)
+
+        :param odoo_item_id: Direct Odoo product_id (preferred)
+        :param item_id: Legacy ItemID
+        :param item_name: Product name for fallback
+        :param pos_session: POS session for company context
+        :return: Tuple of (product, lookup_method) or (None, None)
+        """
+        product_env = request.env["product.product"].sudo()
+        company_id = pos_session.config_id.company_id.id
+
+        # Priority 1: OdooItemID (direct product_id)
+        if odoo_item_id and odoo_item_id > 0:
+            product = product_env.browse(odoo_item_id)
+            if product.exists():
+                _logger.debug(f"Product found by OdooItemID: {odoo_item_id}")
+                return product, "OdooItemID"
+            else:
+                _logger.warning(f"OdooItemID {odoo_item_id} does not exist")
+
+        # Priority 2: ItemID (legacy support)
+        if item_id and item_id > 0:
+            product = product_env.browse(item_id)
+            if product.exists():
+                _logger.info(f"Product found by ItemID (legacy): {item_id}")
+                return product, "ItemID"
+
+        # Priority 3: ItemName exact match
+        if item_name:
+            product = product_env.search([
+                ("name", "=", item_name),
+                ("sale_ok", "=", True),
+                ("available_in_pos", "=", True),
+                "|",
+                ("company_id", "=", False),
+                ("company_id", "=", company_id),
+            ], limit=1)
+
+            if product:
+                _logger.warning(
+                    f"Product found by exact ItemName match: '{item_name}'. "
+                    f"Consider using OdooItemID for better performance."
+                )
+                return product, "ItemName (exact)"
+
+            # Priority 4: ItemName fuzzy match
+            product = product_env.search([
+                ("name", "ilike", item_name),
+                ("sale_ok", "=", True),
+                ("available_in_pos", "=", True),
+                "|",
+                ("company_id", "=", False),
+                ("company_id", "=", company_id),
+            ], limit=1)
+
+            if product:
+                _logger.warning(
+                    f"Product found by fuzzy ItemName match: '{item_name}' -> '{product.name}'. "
+                    f"Consider using OdooItemID for accuracy."
+                )
+                return product, "ItemName (fuzzy)"
+
+        return None, None
+
+    def _validate_product_for_pos(self, product, pos_session):
+        """
+        Validate product is suitable for POS order
+
+        Checks:
+        - Product exists and is active
+        - Product.sale_ok = True
+        - Product.available_in_pos = True
+        - Product company matches session company
+
+        :param product: Product to validate
+        :param pos_session: POS session for company context
+        :return: None if valid, error dict if invalid
+        """
+        if not product:
+            return {
+                "status": 404,
+                "message": "Product not found"
+            }
+
+        if not product.active:
+            return {
+                "status": 400,
+                "message": f"Product '{product.name}' (ID: {product.id}) is not active"
+            }
+
+        if not product.sale_ok:
+            return {
+                "status": 400,
+                "message": f"Product '{product.name}' (ID: {product.id}) is not available for sale"
+            }
+
+        if not product.available_in_pos:
+            return {
+                "status": 400,
+                "message": f"Product '{product.name}' (ID: {product.id}) is not available in POS"
+            }
+
+        # Check company match
+        company_id = pos_session.config_id.company_id.id
+        if product.company_id and product.company_id.id != company_id:
+            return {
+                "status": 400,
+                "message": f"Product '{product.name}' (ID: {product.id}) belongs to a different company"
+            }
+
+        return None
+
     def _prepare_order_lines(self, order_items, pos_session):
         """Prepare order lines from order items"""
         order_lines = []
-        product_env = request.env["product.product"].sudo()
 
         for order_item in order_items:
             item_name = order_item.get("ItemName", "").strip()
             item_id = order_item.get("ItemID", 0)
+            odoo_item_id = order_item.get("OdooItemID", 0)
             price = float(order_item.get("Price", 0))
             quantity = float(order_item.get("Quantity", 1))
             discount_amount = float(order_item.get("DiscountAmount", 0))
 
-            # Find product
-            product = None
-            if item_id and item_id > 0:
-                product = product_env.browse(item_id)
-                if not product.exists():
-                    product = None
-
-            if not product and item_name:
-                product = product_env.search([
-                    ("name", "=", item_name),
-                    ("sale_ok", "=", True),
-                    ("available_in_pos", "=", True),
-                ], limit=1)
-
-                if not product:
-                    product = product_env.search([
-                        ("name", "ilike", item_name),
-                        ("sale_ok", "=", True),
-                        ("available_in_pos", "=", True),
-                    ], limit=1)
+            # Find product using new helper
+            product, lookup_method = self._find_product_by_id(
+                odoo_item_id, item_id, item_name, pos_session
+            )
 
             if not product:
                 return None, {
                     "status": 404,
-                    "message": f'Product not found: ItemName="{item_name}", ItemID={item_id}'
+                    "message": f'Product not found: OdooItemID={odoo_item_id}, ItemID={item_id}, ItemName="{item_name}"'
                 }
+
+            # Validate product for POS
+            validation_error = self._validate_product_for_pos(product, pos_session)
+            if validation_error:
+                return None, validation_error
 
             # Calculate discount percentage
             discount_percent = 0.0

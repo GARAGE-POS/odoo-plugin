@@ -23,3 +23,22 @@ class ResConfigSettings(models.TransientModel):
              'Completed and failed records older than this will be deleted. '
              'Default: 30 days. Set to 0 to disable automatic cleanup.'
     )
+
+    # Bulk sync configuration
+    bulk_sync_max_orders = fields.Integer(
+        string='Bulk Sync Max Orders',
+        default=1000,
+        config_parameter='karage_pos.bulk_sync_max_orders',
+        help='Maximum number of orders allowed in a single bulk sync request. '
+             'Default: 1000 orders.'
+    )
+
+    # Order validation configuration
+    valid_order_statuses = fields.Char(
+        string='Valid Order Statuses',
+        default='103',
+        config_parameter='karage_pos.valid_order_statuses',
+        help='Comma-separated list of valid OrderStatus values from external POS system. '
+             'Only orders with these status codes will be accepted. '
+             'Example: "103,104" to accept multiple statuses. Default: "103" (completed orders).'
+    )
