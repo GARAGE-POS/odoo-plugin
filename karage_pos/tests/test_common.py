@@ -130,16 +130,9 @@ class KaragePosTestCommon:
         )
         cls.pos_session.action_pos_session_open()
 
-        # Create Karage POS config
-        cls.karage_config = cls.env["karage.pos.config"].create(
-            {
-                "name": "Test Config",
-                "api_key": "test_api_key_12345",
-                "active": True,
-                "odoo_url": "http://localhost:8069",
-                "webhook_endpoint": "/api/v1/webhook/pos-order",
-            }
-        )
+        # Set Karage POS API key in system parameters
+        cls.env['ir.config_parameter'].sudo().set_param('karage_pos.api_key', 'test_api_key_12345')
+        cls.api_key = 'test_api_key_12345'
 
         # Sample webhook data
         cls.sample_webhook_data = {

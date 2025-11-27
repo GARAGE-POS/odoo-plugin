@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from . import (karage_pos_config, webhook_idempotency, webhook_log,
-               webhook_sender)
+from . import res_config_settings
+from . import webhook_log
+from . import pos_order
