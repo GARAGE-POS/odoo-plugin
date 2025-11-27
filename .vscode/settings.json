@@ -1,3 +1,7 @@
 {
-    "python.languageServer": "None"
+    "python.languageServer": "None",
+    "sonarlint.connectedMode.project": {
+        "connectionId": "garage-pos",
+        "projectKey": "GARAGE-POS_odoo-plugin"
+    }
 }
