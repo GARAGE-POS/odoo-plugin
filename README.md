@@ -11,24 +11,24 @@
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=GARAGE-POS_odoo-plugin&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=GARAGE-POS_odoo-plugin)
 # Karage POS Odoo Integration
 
-This project provides complete integration between Karage POS systems and Odoo 17 ERP through a custom addon module. The `karage-pos` module processes complete orders from external POS systems into Odoo's standard POS workflow, managing inventory, customers, products, and accounting automatically.
+This project provides complete integration between Karage POS systems and Odoo 18 ERP through a custom addon module. The `karage_pos` module processes complete orders from external POS systems into Odoo's standard POS workflow, managing inventory, customers, products, and accounting automatically.
 
 ## Quick Start
 
 ### With DevContainer (Recommended)
 ```bash
 # Open in VS Code and reopen in container, then:
-odoo --init=karage-pos --addons-path=/mnt/extra-addons --stop-after-init
-odoo --test-enable --update=karage-pos --addons-path=/mnt/extra-addons --stop-after-init --log-level=test
+odoo --init=karage_pos --addons-path=/mnt/extra-addons --stop-after-init
+odoo --test-enable --test-tags=module:karage_pos --update=karage_pos --addons-path=/mnt/extra-addons --stop-after-init --log-level=test
 ```
 
 ### Local Installation
 ```bash
 # Install the module (first time only)
-odoo --init=karage-pos --addons-path=/mnt/extra-addons --stop-after-init
+odoo --init=karage_pos --addons-path=/mnt/extra-addons --stop-after-init
 
 # Run tests
-odoo --test-enable --update=karage-pos --addons-path=/mnt/extra-addons --stop-after-init --log-level=test
+odoo --test-enable --test-tags=module:karage_pos --update=karage_pos --addons-path=/mnt/extra-addons --stop-after-init --log-level=test
 ```
 
 ## Architecture Overview
@@ -43,7 +43,7 @@ The module extends Odoo's built-in Point of Sale (POS) system to handle external
 ## Prerequisites
 
 ### Local Development
-- Odoo 17 installed and configured
+- Odoo 18 installed and configured
 - System Python with Odoo dependencies
 - Coverage module for testing (optional): `/usr/bin/python3 -m pip install coverage --break-system-packages`
 
@@ -61,11 +61,11 @@ Development containers provide a consistent, isolated environment with all depen
 
 1. **Open in VS Code**: Open the project folder in VS Code
 2. **Reopen in Container**: When prompted, click "Reopen in Container" or use Command Palette (`Ctrl+Shift+P`) → "Dev Containers: Reopen in Container"
-3. **Wait for Setup**: The container will build automatically with Odoo 17 and all dependencies
+3. **Wait for Setup**: The container will build automatically with Odoo 18 and all dependencies
 
 #### DevContainer Benefits
 
-- ✅ **Pre-configured Environment**: Odoo 17, PostgreSQL, and Python dependencies included
+- ✅ **Pre-configured Environment**: Odoo 18, PostgreSQL, and Python dependencies included
 - ✅ **Consistent Development**: Same environment across all developers
 - ✅ **Isolated Dependencies**: No conflicts with local Python installations
 - ✅ **VS Code Integration**: Debugging, extensions, and tools work seamlessly
@@ -77,22 +77,22 @@ Once inside the development container:
 
 ```bash
 # Install the module (first time only)
-odoo --init=karage-pos --addons-path=/workspace --stop-after-init
+odoo --init=karage_pos --addons-path=/workspace --stop-after-init
 
 # Run tests
-odoo --test-enable --update=karage-pos --addons-path=/workspace --stop-after-init --log-level=test
+odoo --test-enable --test-tags=module:karage_pos --update=karage_pos --addons-path=/workspace --stop-after-init --log-level=test
 
 # Start Odoo in development mode
 odoo --addons-path=/workspace --dev=reload,qweb,werkzeug,xml
 
 # Run with coverage
-python3 -m coverage run -m odoo --test-enable --update=karage-pos --addons-path=/workspace --stop-after-init --log-level=test
+python3 -m coverage run -m odoo --test-enable --test-tags=module:karage_pos --update=karage_pos --addons-path=/workspace --stop-after-init --log-level=test
 ```
 
 #### DevContainer Configuration
 
 The development container includes:
-- **Odoo 17**: Pre-installed and configured
+- **Odoo 18**: Pre-installed and configured
 - **PostgreSQL**: Database server ready for use
 - **Python Dependencies**: All required packages installed
 - **VS Code Extensions**: Python, Odoo development extensions
@@ -108,18 +108,18 @@ If you prefer local development without containers:
 
 For first-time installation:
 ```bash
-odoo --init=karage-pos --addons-path=/mnt/extra-addons --stop-after-init
+odoo --init=karage_pos --addons-path=/mnt/extra-addons --stop-after-init
 ```
 
 For updates during development:
 ```bash
-odoo --update=karage-pos --addons-path=/mnt/extra-addons --stop-after-init
+odoo --update=karage_pos --addons-path=/mnt/extra-addons --stop-after-init
 ```
 
 ### 2. Module Structure
 
 ```
-karage-pos/
+karage_pos/
 ├── __manifest__.py          # Module metadata and dependencies
 ├── controllers/             # API endpoints
 │   └── order_controller.py  # Main /api/karage/handleOrder endpoint
@@ -177,7 +177,7 @@ Sample request payload:
   "CustomerID": 0,
   "OrderDetails": [
     {
-      "ItemID": 170388,
+      "ItemID": 180388,
       "Name": "Fuchs Oil 5W30 Syn Sn",
       "Price": 25,
       "Quantity": 1,
@@ -203,14 +203,14 @@ Sample request payload:
 
 #### With DevContainer
 ```bash
-# Run all tests for the karage-pos module
-odoo --test-enable --update=karage-pos --addons-path=/workspace --stop-after-init --log-level=test
+# Run all tests for the karage_pos module
+odoo --test-enable --test-tags=module:karage_pos --update=karage_pos --addons-path=/workspace --stop-after-init --log-level=test
 ```
 
 #### Local Installation
 ```bash
-# Run all tests for the karage-pos module
-odoo --test-enable --update=karage-pos --addons-path=/mnt/extra-addons --stop-after-init --log-level=test
+# Run all tests for the karage_pos module
+odoo --test-enable --test-tags=module:karage_pos --update=karage_pos --addons-path=/mnt/extra-addons --stop-after-init --log-level=test
 ```
 
 **Note**: Exit code 1 is normal when using `--stop-after-init` flag.
@@ -220,25 +220,25 @@ odoo --test-enable --update=karage-pos --addons-path=/mnt/extra-addons --stop-af
 #### With DevContainer
 ```bash
 # Run tests with coverage (inside container)
-python3 -m coverage run -m odoo --test-enable --update=karage-pos --addons-path=/workspace --stop-after-init --log-level=test
+python3 -m coverage run -m odoo --test-enable --test-tags=module:karage_pos --update=karage_pos --addons-path=/workspace --stop-after-init --log-level=test
 
 # Generate coverage report
-python3 -m coverage report --include="karage-pos/*" --omit="*/tests/*"
+python3 -m coverage report --include="karage_pos/*" --omit="*/tests/*"
 
 # Generate HTML coverage report
-python3 -m coverage html --include="karage-pos/*" --omit="*/tests/*"
+python3 -m coverage html --include="karage_pos/*" --omit="*/tests/*"
 ```
 
 #### Local Installation
 ```bash
 # Run tests with coverage
-/usr/bin/python3 -m coverage run -m odoo --test-enable --update=karage-pos --addons-path=/mnt/extra-addons --stop-after-init --log-level=test
+/usr/bin/python3 -m coverage run -m odoo --test-enable --test-tags=module:karage_pos --update=karage_pos --addons-path=/mnt/extra-addons --stop-after-init --log-level=test
 
 # Generate coverage report
-/usr/bin/python3 -m coverage report --include="karage-pos/*" --omit="*/tests/*"
+/usr/bin/python3 -m coverage report --include="karage_pos/*" --omit="*/tests/*"
 
 # Generate HTML coverage report
-/usr/bin/python3 -m coverage html --include="karage-pos/*" --omit="*/tests/*"
+/usr/bin/python3 -m coverage html --include="karage_pos/*" --omit="*/tests/*"
 ```
 
 Coverage reports will be available in the `htmlcov/` directory.
@@ -263,30 +263,30 @@ Real POS order data is available in `tests/sample_request.json` for realistic te
 1. Edit code in the appropriate module files
 2. Update the module:
    ```bash
-   odoo --update=karage-pos --addons-path=/workspace --stop-after-init
+   odoo --update=karage_pos --addons-path=/workspace --stop-after-init
    ```
 3. Run tests to verify changes:
    ```bash
-   odoo --test-enable --update=karage-pos --addons-path=/workspace --stop-after-init --log-level=test
+   odoo --test-enable --test-tags=module:karage_pos --update=karage_pos --addons-path=/workspace --stop-after-init --log-level=test
    ```
 
 #### Local Installation
 1. Edit code in the appropriate module files
 2. Update the module:
    ```bash
-   odoo --update=karage-pos --addons-path=/mnt/extra-addons --stop-after-init
+   odoo --update=karage_pos --addons-path=/mnt/extra-addons --stop-after-init
    ```
 3. Run tests to verify changes:
    ```bash
-   odoo --test-enable --update=karage-pos --addons-path=/mnt/extra-addons --stop-after-init --log-level=test
+   odoo --test-enable --test-tags=module:karage_pos --update=karage_pos --addons-path=/mnt/extra-addons --stop-after-init --log-level=test
    ```
 
 ### 2. Key Development Files
 
-- **API Logic**: `karage-pos/controllers/order_controller.py:10-62`
-- **Order Processing**: `karage-pos/models/pos_order.py:26` (process_karage_order method)
-- **Product Management**: `karage-pos/models/product_sync.py:15-50`
-- **Request Logging**: `karage-pos/models/logger.py:3-10`
+- **API Logic**: `karage_pos/controllers/order_controller.py:10-62`
+- **Order Processing**: `karage_pos/models/pos_order.py:26` (process_karage_order method)
+- **Product Management**: `karage_pos/models/product_sync.py:15-50`
+- **Request Logging**: `karage_pos/models/logger.py:3-10`
 
 ### 3. Important Notes
 

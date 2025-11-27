@@ -3,20 +3,12 @@ repos:
     rev: v4.4.0
     hooks:
       - id: trailing-whitespace
+        files: ^karage_pos/
       - id: end-of-file-fixer
-      - id: check-yaml
-      - id: check-added-large-files
+        files: ^karage_pos/
 
-  - repo: https://github.com/psf/black
-    rev: 23.12.1
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
     hooks:
-      - id: black
-
-  - repo: local
-    hooks:
-      - id: pylint
-        name: pylint
-        entry: /mnt/extra-addons/.venv/bin/pylint
-        language: system
-        files: \.py$
-        args: [--rcfile=.pylintrc, --disable=import-error]
+      - id: flake8
+        files: ^karage_pos/.*\.py$

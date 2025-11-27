@@ -13,14 +13,16 @@ _logger = logging.getLogger(__name__)
 class APIController(http.Controller):
     """REST API Controller for webhook endpoint"""
 
-    def _update_idempotency_on_error(self, idempotency_record, error_message, webhook_log=None, start_time=None):
+    def _update_idempotency_on_error(
+        self, idempotency_record, error_message, webhook_log=None, start_time=None
+    ):
         """Helper method to update idempotency record and webhook log on error"""
         if idempotency_record:
             try:
                 idempotency_record.mark_failed(error_message=error_message)
             except Exception as e:
                 _logger.warning(f"Error updating idempotency record on error: {str(e)}")
-        
+
         if webhook_log and start_time is not None:
             try:
                 webhook_log.update_log_result(
@@ -28,12 +30,14 @@ class APIController(http.Controller):
                     response_message=error_message,
                     success=False,
                     idempotency_record_id=idempotency_record,
-                    processing_time=time.time() - start_time
+                    processing_time=time.time() - start_time,
                 )
             except Exception as e:
                 _logger.warning(f"Error updating webhook log on error: {str(e)}")
-    
-    def _update_webhook_log_validation_error(self, webhook_log, status_code, error_message, start_time):
+
+    def _update_webhook_log_validation_error(
+        self, webhook_log, status_code, error_message, start_time
+    ):
         """Helper method to update webhook log for validation errors"""
         if webhook_log and start_time is not None:
             try:
@@ -41,7 +45,7 @@ class APIController(http.Controller):
                     status_code=status_code,
                     response_message=error_message,
                     success=False,
-                    processing_time=time.time() - start_time
+                    processing_time=time.time() - start_time,
                 )
             except Exception as e:
                 _logger.warning(f"Error updating webhook log: {str(e)}")
@@ -91,7 +95,9 @@ class APIController(http.Controller):
         # Only POST requests are allowed
         if request.httprequest.method != "POST":
             return self._json_response(
-                None, status=405, error="Method not allowed. Only POST requests are accepted."
+                None,
+                status=405,
+                error="Method not allowed. Only POST requests are accepted.",
             )
 
         # Initialize variables for exception handling
@@ -99,7 +105,7 @@ class APIController(http.Controller):
         idempotency_record = None
         webhook_log = None
         start_time = time.time()
-        
+
         try:
             # Get JSON data from request body
             if request.httprequest.data:
@@ -112,23 +118,29 @@ class APIController(http.Controller):
                             request.env["karage.pos.webhook.log"]
                             .sudo()
                             .create_log(
-                                webhook_body=request.httprequest.data.decode("utf-8", errors='ignore'),
+                                webhook_body=request.httprequest.data.decode(
+                                    "utf-8", errors="ignore"
+                                ),
                                 request_info={
-                                    'ip_address': request.httprequest.remote_addr,
-                                    'user_agent': request.httprequest.headers.get('User-Agent'),
-                                    'http_method': request.httprequest.method,
-                                }
+                                    "ip_address": request.httprequest.remote_addr,
+                                    "user_agent": request.httprequest.headers.get(
+                                        "User-Agent"
+                                    ),
+                                    "http_method": request.httprequest.method,
+                                },
                             )
                         )
                         webhook_log.update_log_result(
                             status_code=400,
                             response_message=f"Invalid JSON format: {str(e)}",
                             success=False,
-                            processing_time=time.time() - start_time
+                            processing_time=time.time() - start_time,
                         )
                     except Exception as log_error:
-                        _logger.warning(f"Failed to create webhook log: {str(log_error)}")
-                    
+                        _logger.warning(
+                            f"Failed to create webhook log: {str(log_error)}"
+                        )
+
                     return self._json_response(
                         None, status=400, error=f"Invalid JSON format: {str(e)}"
                     )
@@ -141,33 +153,35 @@ class APIController(http.Controller):
                         .create_log(
                             webhook_body="{}",
                             request_info={
-                                'ip_address': request.httprequest.remote_addr,
-                                'user_agent': request.httprequest.headers.get('User-Agent'),
-                                'http_method': request.httprequest.method,
-                            }
+                                "ip_address": request.httprequest.remote_addr,
+                                "user_agent": request.httprequest.headers.get(
+                                    "User-Agent"
+                                ),
+                                "http_method": request.httprequest.method,
+                            },
                         )
                     )
                     webhook_log.update_log_result(
                         status_code=400,
                         response_message="Request body is required",
                         success=False,
-                        processing_time=time.time() - start_time
+                        processing_time=time.time() - start_time,
                     )
                 except Exception as log_error:
                     _logger.warning(f"Failed to create webhook log: {str(log_error)}")
-                
+
                 return self._json_response(
                     None, status=400, error="Request body is required"
                 )
-            
+
             # Extract idempotency key early for logging
             idempotency_key = (
-                request.httprequest.headers.get("Idempotency-Key") or
-                request.httprequest.headers.get("X-Idempotency-Key") or
-                data.get("idempotency_key") or
-                data.get("IdempotencyKey")
+                request.httprequest.headers.get("Idempotency-Key")
+                or request.httprequest.headers.get("X-Idempotency-Key")
+                or data.get("idempotency_key")
+                or data.get("IdempotencyKey")
             )
-            
+
             # Create webhook log entry
             try:
                 webhook_log = (
@@ -177,25 +191,27 @@ class APIController(http.Controller):
                         webhook_body=data,
                         idempotency_key=idempotency_key,
                         request_info={
-                            'ip_address': request.httprequest.remote_addr,
-                            'user_agent': request.httprequest.headers.get('User-Agent'),
-                            'http_method': request.httprequest.method,
-                        }
+                            "ip_address": request.httprequest.remote_addr,
+                            "user_agent": request.httprequest.headers.get("User-Agent"),
+                            "http_method": request.httprequest.method,
+                        },
                     )
                 )
             except Exception as log_error:
                 _logger.warning(f"Failed to create webhook log: {str(log_error)}")
 
             # Authenticate - API key can be in header or body
-            api_key = request.httprequest.headers.get("X-API-KEY") or request.httprequest.headers.get("X-API-Key") or data.get(
-                "api_key"
+            api_key = (
+                request.httprequest.headers.get("X-API-KEY")
+                or request.httprequest.headers.get("X-API-Key")
+                or data.get("api_key")
             )
 
             if not api_key:
                 return self._json_response(
                     None, status=401, error="Invalid or missing API key"
                 )
-            
+
             # Get configured API key from settings
             configured_api_key = request.env['ir.config_parameter'].sudo().get_param('karage_pos.api_key')
             if not configured_api_key:
@@ -203,7 +219,7 @@ class APIController(http.Controller):
                 return self._json_response(
                     None, status=500, error="API key not configured in system settings"
                 )
-            
+
             # Validate API key
             if api_key != configured_api_key:
                 _logger.warning(f"Invalid API key attempt: {api_key[:10]}...")
@@ -212,7 +228,7 @@ class APIController(http.Controller):
                         status_code=401,
                         response_message="Invalid or missing API key",
                         success=False,
-                        processing_time=time.time() - start_time
+                        processing_time=time.time() - start_time,
                     )
                 return self._json_response(
                     None, status=401, error="Invalid or missing API key"
@@ -226,9 +242,9 @@ class APIController(http.Controller):
                     .sudo()
                     .check_idempotency(idempotency_key)
                 )
-                
+
                 if idempotency_record:
-                    if idempotency_record.status == 'completed':
+                    if idempotency_record.status == "completed":
                         # Request already processed successfully, return previous response
                         _logger.info(
                             f"Duplicate request detected with idempotency key: {idempotency_key[:20]}... "
@@ -242,27 +258,43 @@ class APIController(http.Controller):
                                 success=True,
                                 pos_order_id=idempotency_record.pos_order_id,
                                 idempotency_record_id=idempotency_record,
-                                processing_time=time.time() - start_time
+                                processing_time=time.time() - start_time,
                             )
-                        
+
                         if idempotency_record.response_data:
                             try:
-                                previous_response = json.loads(idempotency_record.response_data)
-                                return self._json_response(previous_response, status=200)
+                                previous_response = json.loads(
+                                    idempotency_record.response_data
+                                )
+                                return self._json_response(
+                                    previous_response, status=200
+                                )
                             except (ValueError, TypeError):
                                 pass
                         # If we can't parse the response, return basic info
                         return self._json_response(
                             {
-                                "id": idempotency_record.pos_order_id.id if idempotency_record.pos_order_id else None,
-                                "name": idempotency_record.pos_order_id.name if idempotency_record.pos_order_id else None,
+                                "id": (
+                                    idempotency_record.pos_order_id.id
+                                    if idempotency_record.pos_order_id
+                                    else None
+                                ),
+                                "name": (
+                                    idempotency_record.pos_order_id.name
+                                    if idempotency_record.pos_order_id
+                                    else None
+                                ),
                                 "message": "Request already processed",
                                 "idempotency_key": idempotency_key,
-                                "processed_at": str(idempotency_record.processed_at) if idempotency_record.processed_at else None,
+                                "processed_at": (
+                                    str(idempotency_record.processed_at)
+                                    if idempotency_record.processed_at
+                                    else None
+                                ),
                             },
-                            status=200
+                            status=200,
                         )
-                    elif idempotency_record.status == 'processing':
+                    elif idempotency_record.status == "processing":
                         # Request is currently being processed
                         _logger.warning(
                             f"Request with idempotency key {idempotency_key[:20]}... is already being processed"
@@ -273,20 +305,20 @@ class APIController(http.Controller):
                                 response_message="Request is already being processed. Please wait.",
                                 success=False,
                                 idempotency_record_id=idempotency_record,
-                                processing_time=time.time() - start_time
+                                processing_time=time.time() - start_time,
                             )
                         return self._json_response(
                             None,
                             status=409,
-                            error="Request is already being processed. Please wait."
+                            error="Request is already being processed. Please wait.",
                         )
-                    elif idempotency_record.status == 'failed':
+                    elif idempotency_record.status == "failed":
                         # Previous attempt failed, allow retry but log it
                         _logger.info(
                             f"Retrying previously failed request with idempotency key: {idempotency_key[:20]}..."
                         )
                         idempotency_record.mark_processing()
-            
+
             # Create idempotency record if key provided and not found
             if idempotency_key and not idempotency_record:
                 try:
@@ -296,10 +328,12 @@ class APIController(http.Controller):
                         .create_idempotency_record(
                             idempotency_key,
                             order_id=str(data.get("OrderID", "")),
-                            status='processing'
+                            status="processing",
                         )
                     )
-                    _logger.info(f"Created idempotency record for key: {idempotency_key[:20]}...")
+                    _logger.info(
+                        f"Created idempotency record for key: {idempotency_key[:20]}..."
+                    )
                 except Exception as e:
                     _logger.error(f"Error creating idempotency record: {str(e)}")
                     # Continue processing even if idempotency record creation fails
@@ -315,7 +349,9 @@ class APIController(http.Controller):
             missing_fields = [field for field in required_fields if field not in data]
             if missing_fields:
                 error_msg = f'Missing required fields: {", ".join(missing_fields)}'
-                self._update_webhook_log_validation_error(webhook_log, 400, error_msg, start_time)
+                self._update_webhook_log_validation_error(
+                    webhook_log, 400, error_msg, start_time
+                )
                 return self._json_response(
                     None,
                     status=400,
@@ -672,10 +708,10 @@ class APIController(http.Controller):
             except Exception as e:
                 _logger.error(f"Error confirming POS order: {str(e)}", exc_info=True)
                 error_msg = f"Failed to confirm order: {str(e)}"
-                self._update_idempotency_on_error(idempotency_record, error_msg, webhook_log, start_time)
-                return self._json_response(
-                    None, status=500, error=error_msg
+                self._update_idempotency_on_error(
+                    idempotency_record, error_msg, webhook_log, start_time
                 )
+                return self._json_response(None, status=500, error=error_msg)
 
             # Create picking for inventory consumption (if needed)
             try:
@@ -697,17 +733,16 @@ class APIController(http.Controller):
                 "date_order": str(pos_order.date_order),
                 "external_order_id": data.get("OrderID"),
             }
-            
+
             # Update idempotency record if exists
             if idempotency_record:
                 try:
                     idempotency_record.mark_completed(
-                        pos_order_id=pos_order,
-                        response_data=json.dumps(response_data)
+                        pos_order_id=pos_order, response_data=json.dumps(response_data)
                     )
                 except Exception as e:
                     _logger.warning(f"Error updating idempotency record: {str(e)}")
-            
+
             # Update webhook log with success
             if webhook_log:
                 try:
@@ -717,18 +752,18 @@ class APIController(http.Controller):
                         success=True,
                         pos_order_id=pos_order,
                         idempotency_record_id=idempotency_record,
-                        processing_time=time.time() - start_time
+                        processing_time=time.time() - start_time,
                     )
                 except Exception as e:
                     _logger.warning(f"Error updating webhook log: {str(e)}")
-            
+
             # Return success response
             return self._json_response(response_data)
 
         except Exception as e:
             _logger.error(f"Error in webhook_pos_order: {str(e)}", exc_info=True)
             error_msg = f"Internal server error: {str(e)}"
-            self._update_idempotency_on_error(idempotency_record, error_msg, webhook_log, start_time)
-            return self._json_response(
-                None, status=500, error=error_msg
+            self._update_idempotency_on_error(
+                idempotency_record, error_msg, webhook_log, start_time
             )
+            return self._json_response(None, status=500, error=error_msg)

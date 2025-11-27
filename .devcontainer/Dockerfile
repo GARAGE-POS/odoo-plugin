@@ -36,6 +36,7 @@ RUN apt-get update && \
         libgdbm-dev \
         python3-pip \
         python3-dev \
+        python3-venv \
         libgdbm-compat-dev \
         psmisc \
         libnss3-dev \
@@ -88,8 +89,7 @@ RUN wget -q -O - https://nightly.odoo.com/odoo.key | gpg --dearmor -o /usr/share
     && apt-get install -y --no-install-recommends odoo \
     && rm -rf /var/lib/apt/lists/*
 
-# Install debugpy and coverage for debugging and testing
-RUN /usr/bin/python3 -m pip install --break-system-packages --no-cache-dir debugpy coverage
+# ...existing code...
 
 # Copy entrypoint script and Odoo configuration file
 COPY ./entrypoint.sh /
@@ -126,14 +126,17 @@ RUN apt-get update \
         usermod -a -G $GROUP_NAME odoo; \
     fi \
     && usermod -s /bin/bash odoo \
-    && mkdir -p /home/odoo \
-    && chown -R odoo:odoo /home/odoo \
+        && mkdir -p /home/odoo \
+        && chown -R odoo:odoo /home/odoo \
     && chown -R odoo:odoo /var/lib/odoo \
     && chown -R odoo:odoo /mnt/extra-addons \
     && rm -rf /var/lib/apt/lists/*
 
 # Set default user when running the container
 USER odoo
+
+# Setup bashrc to activate venv automatically
+RUN echo 'if [ -f /home/odoo/venv/bin/activate ]; then source /home/odoo/venv/bin/activate; fi' >> /home/odoo/.bashrc
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["sleep", "infinity"]
