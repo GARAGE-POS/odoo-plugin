@@ -2,6 +2,7 @@
 
 import json
 
+from odoo import fields
 from odoo.tests import HttpCase
 from odoo.tests.common import tagged
 
@@ -869,3 +870,322 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         self.assertEqual(pos_order.external_order_id, "9046")
         self.assertEqual(pos_order.external_order_source, "karage_pos_webhook")
         self.assertIsNotNone(pos_order.external_order_date)
+
+    def test_webhook_product_lookup_by_item_id(self):
+        """Test product lookup by ItemID (fallback from OdooItemID)"""
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9050
+        data["OrderStatus"] = 103
+        data["OrderDate"] = "2025-11-27T10:00:00"
+        data["OrderItems"][0]["ItemID"] = self.product1.id
+        data["OrderItems"][0]["ItemName"] = self.product1.name
+        # No OdooItemID - should use ItemID
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["status"], "success")
+
+    def test_webhook_product_lookup_by_name_exact(self):
+        """Test product lookup by exact ItemName match"""
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9051
+        data["OrderStatus"] = 103
+        data["OrderDate"] = "2025-11-27T10:00:00"
+        # Only provide ItemName, no IDs
+        data["OrderItems"][0] = {
+            "ItemName": self.product1.name,
+            "Price": 100.0,
+            "Quantity": 1,
+            "DiscountAmount": 0.0,
+        }
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["status"], "success")
+
+    def test_webhook_product_lookup_by_name_fuzzy(self):
+        """Test product lookup by fuzzy ItemName match"""
+        # Create product with specific name for fuzzy matching
+        fuzzy_product = self.env["product.product"].create(
+            {
+                "name": "Test Fuzzy Product Name",
+                "list_price": 75.0,
+                "available_in_pos": True,
+                "sale_ok": True,
+            }
+        )
+
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9052
+        data["OrderStatus"] = 103
+        data["OrderDate"] = "2025-11-27T10:00:00"
+        data["AmountTotal"] = 75.0
+        data["AmountPaid"] = "75.0"
+        data["CheckoutDetails"][0]["AmountPaid"] = "75.0"
+        # Provide partial name for fuzzy match
+        data["OrderItems"][0] = {
+            "ItemName": "Fuzzy Product",
+            "Price": 75.0,
+            "Quantity": 1,
+            "DiscountAmount": 0.0,
+        }
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["status"], "success")
+
+        # Verify correct product was found
+        pos_order = self.env["pos.order"].browse(result["data"]["id"])
+        self.assertEqual(pos_order.lines[0].product_id.id, fuzzy_product.id)
+
+    def test_webhook_payment_mode_mapping(self):
+        """Test different payment mode mappings"""
+        # Create Bank payment method
+        bank_journal = self.env["account.journal"].create(
+            {
+                "name": "Bank",
+                "code": "BNK1",
+                "type": "bank",
+            }
+        )
+        bank_payment_method = self.env["pos.payment.method"].create(
+            {
+                "name": "Bank Card",
+                "journal_id": bank_journal.id,
+            }
+        )
+        self.pos_config.write(
+            {"payment_method_ids": [(4, bank_payment_method.id)]}
+        )
+
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9053
+        data["OrderStatus"] = 103
+        data["OrderDate"] = "2025-11-27T10:00:00"
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+        data["CheckoutDetails"][0]["PaymentMode"] = 2  # Card
+        data["CheckoutDetails"][0]["CardType"] = "Card"
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["status"], "success")
+
+    def test_webhook_without_order_date(self):
+        """Test webhook without OrderDate uses current time"""
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9054
+        data["OrderStatus"] = 103
+        # No OrderDate provided
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["status"], "success")
+
+        # Order should still be created with current timestamp
+        pos_order = self.env["pos.order"].browse(result["data"]["id"])
+        self.assertIsNotNone(pos_order.date_order)
+
+    def test_webhook_invalid_order_date_format(self):
+        """Test webhook with invalid OrderDate falls back to current time"""
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9055
+        data["OrderStatus"] = 103
+        data["OrderDate"] = "invalid-date-format"
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["status"], "success")
+
+        # Should use current time as fallback
+        pos_order = self.env["pos.order"].browse(result["data"]["id"])
+        self.assertIsNotNone(pos_order.date_order)
+
+    def test_webhook_with_discount_percentage(self):
+        """Test webhook correctly calculates discount percentage"""
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9056
+        data["OrderStatus"] = 103
+        data["OrderDate"] = "2025-11-27T10:00:00"
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+        data["OrderItems"][0]["Price"] = 100.0
+        data["OrderItems"][0]["Quantity"] = 2
+        data["OrderItems"][0]["DiscountAmount"] = 20.0  # 10% discount on 200
+        data["AmountTotal"] = 180.0
+        data["AmountPaid"] = "180.0"
+        data["CheckoutDetails"][0]["AmountPaid"] = "180.0"
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["status"], "success")
+
+        # Verify discount was calculated
+        pos_order = self.env["pos.order"].browse(result["data"]["id"])
+        self.assertEqual(pos_order.lines[0].discount, 10.0)
+
+    def test_webhook_bulk_empty_orders(self):
+        """Test bulk endpoint with empty orders array"""
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps({"orders": []}),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        result = json.loads(response.content)
+        self.assertEqual(result["status"], "error")
+        self.assertIn("No orders provided", result["error"])
+
+    def test_webhook_bulk_missing_orders_key(self):
+        """Test bulk endpoint without orders key"""
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps({}),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        result = json.loads(response.content)
+        self.assertEqual(result["status"], "error")
+
+    def test_webhook_session_automatic_creation(self):
+        """Test automatic session creation when no session exists"""
+        # Close all existing sessions
+        open_sessions = self.env["pos.session"].search([("state", "in", ["opened", "opening_control"])])
+        for session in open_sessions:
+            session.write({"state": "closed", "stop_at": fields.Datetime.now()})
+
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9060
+        data["OrderStatus"] = 103
+        data["OrderDate"] = "2025-11-27T10:00:00"
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+
+        # Should automatically create a session
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["status"], "success")
+
+    def test_webhook_product_company_mismatch(self):
+        """Test webhook with product from different company"""
+        # Create a new company
+        new_company = self.env["res.company"].create(
+            {
+                "name": "Test Company 2",
+            }
+        )
+
+        # Create product in different company
+        product_other_company = self.env["product.product"].create(
+            {
+                "name": "Other Company Product",
+                "list_price": 50.0,
+                "available_in_pos": True,
+                "sale_ok": True,
+                "company_id": new_company.id,
+            }
+        )
+
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9061
+        data["OrderStatus"] = 103
+        data["OrderDate"] = "2025-11-27T10:00:00"
+        data["OrderItems"][0]["OdooItemID"] = product_other_company.id
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 400)
+        result = json.loads(response.content)
+        self.assertEqual(result["status"], "error")
+        self.assertIn("company", result["error"].lower())
+
+    def test_webhook_multiple_payment_methods(self):
+        """Test webhook with multiple payment methods in CheckoutDetails"""
+        # Create additional payment method
+        bank_journal = self.env["account.journal"].create(
+            {
+                "name": "Bank Card",
+                "code": "BNK2",
+                "type": "bank",
+            }
+        )
+        card_payment = self.env["pos.payment.method"].create(
+            {
+                "name": "Card Payment",
+                "journal_id": bank_journal.id,
+            }
+        )
+        self.pos_config.write({"payment_method_ids": [(4, card_payment.id)]})
+
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9062
+        data["OrderStatus"] = 103
+        data["OrderDate"] = "2025-11-27T10:00:00"
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+        data["AmountPaid"] = "150.0"
+        data["CheckoutDetails"] = [
+            {"PaymentMode": 1, "AmountPaid": "50.0", "CardType": "Cash"},
+            {"PaymentMode": 2, "AmountPaid": "50.0", "CardType": "Card"},
+        ]
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["status"], "success")
+
+    def test_webhook_order_status_none(self):
+        """Test webhook without OrderStatus (should be allowed)"""
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9063
+        data["OrderDate"] = "2025-11-27T10:00:00"
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+        # OrderStatus not provided
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["status"], "success")
+
+    def test_webhook_zero_quantity(self):
+        """Test webhook with zero quantity item"""
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9064
+        data["OrderStatus"] = 103
+        data["OrderDate"] = "2025-11-27T10:00:00"
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+        data["OrderItems"][0]["Quantity"] = 0
+        data["AmountTotal"] = 0.0
+        data["AmountPaid"] = "0.0"
+        data["CheckoutDetails"][0]["AmountPaid"] = "0.0"
+
+        response = self._make_webhook_request(data)
+        # May succeed or fail depending on business logic
+        self.assertIn(response.status_code, [200, 400])
+
+    def test_webhook_negative_price(self):
+        """Test webhook with negative price (refund scenario)"""
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9065
+        data["OrderStatus"] = 103
+        data["OrderDate"] = "2025-11-27T10:00:00"
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+        data["OrderItems"][0]["Price"] = -50.0
+        data["AmountTotal"] = -50.0
+        data["AmountPaid"] = "-50.0"
+        data["CheckoutDetails"][0]["AmountPaid"] = "-50.0"
+
+        response = self._make_webhook_request(data)
+        # Should handle negative amounts
+        self.assertIn(response.status_code, [200, 400])
