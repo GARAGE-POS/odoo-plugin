@@ -139,9 +139,14 @@ class KaragePosTestCommon:
         )
         cls.pos_session.action_pos_session_open()
 
-        # Set Karage POS API key in system parameters
-        cls.env['ir.config_parameter'].sudo().set_param('karage_pos.api_key', 'test_api_key_12345')
-        cls.api_key = 'test_api_key_12345'
+        # Create a real API key for test user using Odoo's API key system
+        cls.api_key_record = cls.env["res.users.apikeys"].create({
+            "name": "Test API Key",
+            "user_id": cls.user.id,
+            "scope": "rpc",
+        })
+        # Generate the actual key value
+        cls.api_key = cls.api_key_record._generate()
 
         # Sample webhook data
         cls.sample_webhook_data = {
