@@ -7,6 +7,7 @@ which allows coverage tools to track code execution properly.
 """
 
 import json
+import uuid
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
@@ -267,6 +268,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
         log = self.env["karage.pos.webhook.log"].create({
             "webhook_body": "{}",
             "status": "pending",
+            "idempotency_key": str(uuid.uuid4()),
         })
 
         mock_request = self._create_mock_request()
@@ -294,6 +296,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
         log = self.env["karage.pos.webhook.log"].create({
             "webhook_body": "{}",
             "status": "pending",
+            "idempotency_key": str(uuid.uuid4()),
         })
 
         pos_order = self.env["pos.order"].create({
@@ -343,6 +346,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
         log = self.env["karage.pos.webhook.log"].create({
             "webhook_body": "{}",
             "status": "pending",
+            "idempotency_key": str(uuid.uuid4()),
         })
 
         mock_request = self._create_mock_request()
