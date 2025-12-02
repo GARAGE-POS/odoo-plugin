@@ -1035,7 +1035,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
         self.assertEqual(error_count, 1)
 
 
-@tagged("post_install", "-at_install")
+@tagged("post_install", "-at_install", "-standard", "process_order")
 class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
     """Unit tests for _process_pos_order method"""
 
