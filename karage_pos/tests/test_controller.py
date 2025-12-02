@@ -17,11 +17,13 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
     def setUpClass(cls):
         super().setUpClass()
         cls.setup_common()
+        # Commit setup data so it's visible to HTTP requests
+        cls.env.cr.commit()
 
     def setUp(self):
         super().setUp()
         self.webhook_url = "/api/v1/webhook/pos-order"
-        self.api_key = "test_api_key_12345"
+        # Use the real API key generated in test_common.py
         # Ensure sample_webhook_data has correct product IDs
         if hasattr(self, "sample_webhook_data"):
             self.sample_webhook_data["OrderItems"][0]["ItemID"] = self.product1.id
