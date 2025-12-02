@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import json
+import uuid
 from datetime import datetime, timedelta
 
 from odoo import fields
@@ -96,7 +97,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
     def test_create_log_with_idempotency_key(self):
         """Test creating log with idempotency key"""
         body = {"OrderID": 789}
-        idempotency_key = "test-key-123"
+        idempotency_key = f"test-key-{uuid.uuid4()}"
         log = self.WebhookLog.create_log(
             webhook_body=body, idempotency_key=idempotency_key
         )
@@ -128,7 +129,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
 
     def test_idempotency_key_unique_constraint(self):
         """Test idempotency key uniqueness constraint"""
-        idempotency_key = "unique-key-test"
+        idempotency_key = f"unique-key-{uuid.uuid4()}"
         self.WebhookLog.create_log(
             webhook_body={"OrderID": 1}, idempotency_key=idempotency_key
         )
@@ -141,7 +142,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
 
     def test_get_or_create_log_new_record(self):
         """Test get_or_create_log creates new record"""
-        idempotency_key = "new-record-key"
+        idempotency_key = f"new-record-{uuid.uuid4()}"
         record, created = self.WebhookLog.get_or_create_log(
             idempotency_key=idempotency_key,
             order_id="12345",
@@ -154,7 +155,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
 
     def test_get_or_create_log_existing_record(self):
         """Test get_or_create_log returns existing record"""
-        idempotency_key = "existing-record-key"
+        idempotency_key = f"existing-record-{uuid.uuid4()}"
         # Create first record
         first_record, created1 = self.WebhookLog.get_or_create_log(
             idempotency_key=idempotency_key,
@@ -173,7 +174,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
 
     def test_get_or_create_log_with_webhook_body(self):
         """Test get_or_create_log with webhook body"""
-        idempotency_key = "body-key-test"
+        idempotency_key = f"body-key-{uuid.uuid4()}"
         webhook_body = {"OrderID": 999, "AmountTotal": 500.0}
 
         record, created = self.WebhookLog.get_or_create_log(
@@ -502,7 +503,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
         """Test get_or_create_log handles lock exception when record exists"""
         from unittest.mock import patch
 
-        idempotency_key = "lock-exception-test-key"
+        idempotency_key = f"lock-exception-{uuid.uuid4()}"
 
         # First create the record normally
         first_record, created = self.WebhookLog.get_or_create_log(
@@ -532,9 +533,8 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
     def test_get_or_create_log_create_exception_with_existing_record(self):
         """Test get_or_create_log handles create exception when record exists"""
         from unittest.mock import patch
-        import uuid
 
-        idempotency_key = f"create-exception-test-{uuid.uuid4()}"
+        idempotency_key = f"create-exception-{uuid.uuid4()}"
 
         # First create a record with this key
         first_record = self.WebhookLog.create({
@@ -578,9 +578,8 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
     def test_get_or_create_log_create_with_webhook_body_raises(self):
         """Test get_or_create_log when create with webhook_body raises exception"""
         from unittest.mock import patch
-        import uuid
 
-        idempotency_key = f"body-create-exception-{uuid.uuid4()}"
+        idempotency_key = f"body-create-{uuid.uuid4()}"
 
         # First create with different call to set up the record
         first_record = self.WebhookLog.create({

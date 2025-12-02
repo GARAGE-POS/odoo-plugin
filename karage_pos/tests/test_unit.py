@@ -622,9 +622,10 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
         mock_request = self._create_mock_request()
         mock_request.env = self.env
 
+        unique_key = str(uuid.uuid4())
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             should_process, result = self.controller._check_idempotency(
-                "new-unique-key", "123", None, datetime.now().timestamp()
+                unique_key, "123", None, datetime.now().timestamp()
             )
 
         self.assertTrue(should_process)
@@ -633,9 +634,10 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
     def test_check_idempotency_completed(self):
         """Test idempotency check with completed request"""
         # Create completed record
+        completed_key = str(uuid.uuid4())
         self.env["karage.pos.webhook.log"].create({
             "webhook_body": "{}",
-            "idempotency_key": "completed-key",
+            "idempotency_key": completed_key,
             "status": "completed",
             "response_data": '{"id": 1}',
         })
@@ -645,7 +647,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             should_process, result = self.controller._check_idempotency(
-                "completed-key", "123", None, datetime.now().timestamp()
+                completed_key, "123", None, datetime.now().timestamp()
             )
 
         self.assertFalse(should_process)
@@ -653,9 +655,10 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
     def test_check_idempotency_processing(self):
         """Test idempotency check with processing request"""
         # Create processing record
+        processing_key = str(uuid.uuid4())
         self.env["karage.pos.webhook.log"].create({
             "webhook_body": "{}",
-            "idempotency_key": "processing-key",
+            "idempotency_key": processing_key,
             "status": "processing",
         })
 
@@ -664,7 +667,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             should_process, result = self.controller._check_idempotency(
-                "processing-key", "123", None, datetime.now().timestamp()
+                processing_key, "123", None, datetime.now().timestamp()
             )
 
         self.assertFalse(should_process)
@@ -672,9 +675,10 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
     def test_check_idempotency_failed_retry(self):
         """Test idempotency check allows retry of failed request"""
         # Create failed record
+        failed_key = str(uuid.uuid4())
         self.env["karage.pos.webhook.log"].create({
             "webhook_body": "{}",
-            "idempotency_key": "failed-key",
+            "idempotency_key": failed_key,
             "status": "failed",
         })
 
@@ -683,7 +687,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             should_process, result = self.controller._check_idempotency(
-                "failed-key", "123", None, datetime.now().timestamp()
+                failed_key, "123", None, datetime.now().timestamp()
             )
 
         self.assertTrue(should_process)
@@ -696,9 +700,10 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
         )
 
         # Create old processing record
+        stuck_key = str(uuid.uuid4())
         old_record = self.env["karage.pos.webhook.log"].create({
             "webhook_body": "{}",
-            "idempotency_key": "stuck-key",
+            "idempotency_key": stuck_key,
             "status": "processing",
         })
         # Manually set create_date to the past
@@ -713,7 +718,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             should_process, result = self.controller._check_idempotency(
-                "stuck-key", "123", None, datetime.now().timestamp()
+                stuck_key, "123", None, datetime.now().timestamp()
             )
 
         self.assertTrue(should_process)
@@ -2149,9 +2154,10 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
     def test_check_idempotency_completed_invalid_cached_response(self):
         """Test idempotency with invalid cached response data"""
         # Create completed record with invalid JSON
+        invalid_json_key = str(uuid.uuid4())
         self.env["karage.pos.webhook.log"].create({
             "webhook_body": "{}",
-            "idempotency_key": "invalid-json-key",
+            "idempotency_key": invalid_json_key,
             "status": "completed",
             "response_data": "not valid json",
         })
@@ -2161,7 +2167,7 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             should_process, result = self.controller._check_idempotency(
-                "invalid-json-key", "123", None, datetime.now().timestamp()
+                invalid_json_key, "123", None, datetime.now().timestamp()
             )
 
         # Should return fallback response
@@ -2192,9 +2198,10 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
             })],
         })
 
+        no_cached_key = str(uuid.uuid4())
         self.env["karage.pos.webhook.log"].create({
             "webhook_body": "{}",
-            "idempotency_key": "no-cached-data-key",
+            "idempotency_key": no_cached_key,
             "status": "completed",
             "response_data": None,
             "pos_order_id": pos_order.id,
@@ -2205,7 +2212,7 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             should_process, result = self.controller._check_idempotency(
-                "no-cached-data-key", "123", None, datetime.now().timestamp()
+                no_cached_key, "123", None, datetime.now().timestamp()
             )
 
         # Should return fallback response
@@ -2237,7 +2244,7 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
         idem_record = self.env["karage.pos.webhook.log"].create({
             "webhook_body": "{}",
             "status": "processing",
-            "idempotency_key": "error-test-key",
+            "idempotency_key": str(uuid.uuid4()),
         })
 
         mock_request = self._create_mock_request()
@@ -2336,9 +2343,10 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
     def test_check_idempotency_processing_no_create_date(self):
         """Test idempotency processing without create_date"""
         # Create processing record and set create_date to None via SQL
+        no_date_key = str(uuid.uuid4())
         record = self.env["karage.pos.webhook.log"].create({
             "webhook_body": "{}",
-            "idempotency_key": "no-create-date-key",
+            "idempotency_key": no_date_key,
             "status": "processing",
         })
         self.env.cr.execute(
@@ -2351,7 +2359,7 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             should_process, result = self.controller._check_idempotency(
-                "no-create-date-key", "123", None, datetime.now().timestamp()
+                no_date_key, "123", None, datetime.now().timestamp()
             )
 
         # Should return processing error
