@@ -686,7 +686,6 @@ class APIController(http.Controller):
                 "date_order": order_datetime,  # Use external timestamp
                 "partner_id": False,
                 "to_invoice": False,
-                "general_note": f'External Order ID: {data.get("OrderID")}',
                 "lines": order_lines,
                 "amount_total": final_total,
                 "amount_tax": final_tax,
@@ -697,6 +696,11 @@ class APIController(http.Controller):
                 "external_order_source": "karage_pos_webhook",
                 "external_order_date": order_datetime,
             }
+
+            # Add general_note field if it exists (Odoo 18+ only)
+            pos_order_model = request.env["pos.order"]
+            if "general_note" in pos_order_model._fields:
+                order_vals["general_note"] = f'External Order ID: {data.get("OrderID")}'
 
             pos_order = request.env["pos.order"].sudo().create(order_vals)
 
