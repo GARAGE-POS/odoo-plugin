@@ -3,7 +3,8 @@
   "dockerComposeFile": "docker-compose.yaml",
   "service": "odoo",
   "features": {
-    "ghcr.io/devcontainers/features/python:1": {}
+    "ghcr.io/devcontainers/features/python:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "workspaceFolder": "/mnt/extra-addons",
   "mounts": [

@@ -274,6 +274,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
                 "amount": 15.0,
                 "type_tax_use": "sale",
                 "company_id": self.company.id,
+                "tax_group_id": self.tax_group.id,
             }
         )
 

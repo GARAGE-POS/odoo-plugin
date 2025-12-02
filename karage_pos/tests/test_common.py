@@ -64,6 +64,14 @@ class KaragePosTestCommon:
             }
         )
 
+        # Create tax group (required in Odoo 18)
+        cls.tax_group = cls.env["account.tax.group"].create(
+            {
+                "name": "Test Tax Group",
+                "sequence": 1,
+            }
+        )
+
         # Create payment journals
         cls.journal_cash = cls.env["account.journal"].create(
             {

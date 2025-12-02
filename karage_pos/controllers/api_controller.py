@@ -1056,6 +1056,7 @@ class APIController(http.Controller):
                 "payment_method_id": payment_method.id,
                 "amount": amount,
                 "payment_date": fields.Datetime.now(),
+                "session_id": pos_session.id,
             }))
 
         if not payment_lines:

@@ -1311,6 +1311,7 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
             "amount": 15.0,
             "type_tax_use": "sale",
             "company_id": self.company.id,
+            "tax_group_id": self.tax_group.id,
         })
         self.product1.write({"taxes_id": [(6, 0, [tax.id])]})
 
