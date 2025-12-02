@@ -532,8 +532,9 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
     def test_get_or_create_log_create_exception_with_existing_record(self):
         """Test get_or_create_log handles create exception when record exists"""
         from unittest.mock import patch
+        import uuid
 
-        idempotency_key = "create-exception-test"
+        idempotency_key = f"create-exception-test-{uuid.uuid4()}"
 
         # First create a record with this key
         first_record = self.WebhookLog.create({
@@ -577,8 +578,9 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
     def test_get_or_create_log_create_with_webhook_body_raises(self):
         """Test get_or_create_log when create with webhook_body raises exception"""
         from unittest.mock import patch
+        import uuid
 
-        idempotency_key = "body-create-exception"
+        idempotency_key = f"body-create-exception-{uuid.uuid4()}"
 
         # First create with different call to set up the record
         first_record = self.WebhookLog.create({
