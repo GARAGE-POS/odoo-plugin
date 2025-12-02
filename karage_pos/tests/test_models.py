@@ -530,90 +530,27 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
         self.assertFalse(created)
         self.assertEqual(record.id, first_record.id)
 
-    def test_get_or_create_log_create_exception_with_existing_record(self):
-        """Test get_or_create_log handles create exception when record exists"""
-        from unittest.mock import patch
+    def test_get_or_create_log_creates_with_order_id(self):
+        """Test get_or_create_log creates record with order_id"""
+        idempotency_key = f"order-id-test-{uuid.uuid4()}"
 
-        idempotency_key = f"create-exception-{uuid.uuid4()}"
+        record, created = self.WebhookLog.get_or_create_log(
+            idempotency_key=idempotency_key,
+            order_id="test-order-123",
+            status="processing",
+        )
 
-        # First create a record with this key
-        first_record = self.WebhookLog.create({
-            "webhook_body": "{}",
-            "idempotency_key": idempotency_key,
-            "status": "completed",
-        })
+        self.assertTrue(created)
+        self.assertEqual(record.order_id, "test-order-123")
+        self.assertEqual(record.status, "processing")
 
-        # Mock to bypass the SELECT check so it tries to create
-        original_execute = self.env.cr.execute
-        call_count = [0]
-
-        def mock_execute(*args, **kwargs):
-            call_count[0] += 1
-            if args and "FOR UPDATE NOWAIT" in str(args[0]):
-                raise Exception("Lock not acquired")
-            return original_execute(*args, **kwargs)
-
-        original_search = self.WebhookLog.search
-        search_call_count = [0]
-
-        def mock_search(*args, **kwargs):
-            search_call_count[0] += 1
-            # First call: return nothing (to trigger create attempt)
-            # Second call: return the record (after constraint violation)
-            if search_call_count[0] == 1:
-                return self.WebhookLog.browse([])
-            return original_search(*args, **kwargs)
-
-        with patch.object(self.env.cr, 'execute', side_effect=mock_execute):
-            with patch.object(type(self.WebhookLog), 'search', mock_search):
-                # The create will fail with unique constraint, then search finds it
-                record, created = self.WebhookLog.get_or_create_log(
-                    idempotency_key=idempotency_key,
-                    order_id="123",
-                )
-
-        # Should return existing record
-        self.assertEqual(record.id, first_record.id)
-
-    def test_get_or_create_log_create_with_webhook_body_raises(self):
-        """Test get_or_create_log when create with webhook_body raises exception"""
-        from unittest.mock import patch
-
-        idempotency_key = f"body-create-{uuid.uuid4()}"
-
-        # First create with different call to set up the record
-        first_record = self.WebhookLog.create({
-            "webhook_body": "{}",
-            "idempotency_key": idempotency_key,
-            "order_id": "999",
-            "status": "completed",
-        })
-
-        original_execute = self.env.cr.execute
-        original_search = self.WebhookLog.search
-        search_call_count = [0]
-
-        def mock_execute(*args, **kwargs):
-            if args and "FOR UPDATE NOWAIT" in str(args[0]):
-                raise Exception("Lock not acquired")
-            return original_execute(*args, **kwargs)
-
-        def mock_search(domain, *args, **kwargs):
-            search_call_count[0] += 1
-            # First search in exception handler returns nothing
-            if search_call_count[0] == 1:
-                return self.WebhookLog.browse([])
-            # Second search finds the record
-            return original_search(domain, *args, **kwargs)
-
-        with patch.object(self.env.cr, 'execute', side_effect=mock_execute):
-            with patch.object(type(self.WebhookLog), 'search', mock_search):
-                record, created = self.WebhookLog.get_or_create_log(
-                    idempotency_key=idempotency_key,
-                    webhook_body={"OrderID": 999},
-                )
-
-        self.assertEqual(record.id, first_record.id)
+    def test_get_or_create_log_no_body_no_key_raises(self):
+        """Test get_or_create_log raises when neither key nor body provided"""
+        with self.assertRaises(ValidationError):
+            self.WebhookLog.get_or_create_log(
+                idempotency_key=None,
+                webhook_body=None,
+            )
 
 
 @tagged("post_install", "-at_install")

@@ -139,6 +139,9 @@ class APIController(http.Controller):
                 .with_user(1)
                 ._check_credentials(scope="rpc", key=api_key)
             )
+            if not user_id:
+                _logger.warning("Invalid API key - no user found")
+                return False, "Invalid or missing API key"
             request.update_env(user=user_id)
             _logger.info(f"API request authenticated for user ID: {user_id}")
             return True, None
