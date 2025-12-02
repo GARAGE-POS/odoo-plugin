@@ -81,6 +81,7 @@ class KaragePosTestCommon:
                 "default_account_id": cls.account_cash.id,
             }
         )
+        cls.cash_journal = cls.journal_cash  # Alias for backward compatibility
 
         cls.journal_card = cls.env["account.journal"].create(
             {

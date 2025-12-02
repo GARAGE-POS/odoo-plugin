@@ -1635,14 +1635,11 @@ class TestWebhookLogUnit(TransactionCase, KaragePosTestCommon):
         self.assertEqual(count, 0)
 
 
-@tagged("post_install", "-at_install", "-standard", "api_controller_coverage")
+@tagged("post_install", "-at_install", "api_controller_coverage")
 class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
     """Additional tests for 100% coverage of API controller
 
-    Note: These tests are tagged with -standard to exclude from CI runs
-    because they directly call controller methods which return MagicMock
-    responses that Odoo's HTTP framework wrapper cannot handle.
-    Run locally with: --test-tags=api_controller_coverage
+    These tests directly call controller methods to maximize coverage.
     """
 
     @classmethod
@@ -2364,3 +2361,746 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
 
         # Should return processing error
         self.assertFalse(should_process)
+
+
+@tagged("post_install", "-at_install", "webhook_log_coverage")
+class TestWebhookLogCoverage(TransactionCase, KaragePosTestCommon):
+    """Additional tests for webhook_log.py edge cases - lines 228-240"""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.setup_common()
+        cls.WebhookLog = cls.env["karage.pos.webhook.log"]
+
+    def test_get_or_create_log_exception_with_existing_record(self):
+        """Test get_or_create_log when create fails but record exists (lines 228-237)"""
+        idempotency_key = f"test-exception-existing-{uuid.uuid4()}"
+
+        # Create an existing record first
+        existing_record = self.WebhookLog.create({
+            "webhook_body": "{}",
+            "idempotency_key": idempotency_key,
+            "status": "pending",
+        })
+
+        # Now try to get_or_create - should find existing
+        record, created = self.WebhookLog.get_or_create_log(
+            idempotency_key=idempotency_key,
+            order_id="123",
+        )
+
+        self.assertFalse(created)
+        self.assertEqual(record.id, existing_record.id)
+
+    def test_get_or_create_log_no_idempotency_key_no_webhook_body(self):
+        """Test get_or_create_log without idempotency key or webhook body raises ValidationError"""
+        from odoo.exceptions import ValidationError as OdooValidationError
+
+        with self.assertRaises(OdooValidationError):
+            self.WebhookLog.get_or_create_log(
+                idempotency_key=None,
+                order_id="123",
+                webhook_body=None,
+            )
+
+    def test_get_or_create_log_no_idempotency_key_with_body(self):
+        """Test get_or_create_log without idempotency key but with webhook body"""
+        record, created = self.WebhookLog.get_or_create_log(
+            idempotency_key=None,
+            order_id="123",
+            webhook_body={"OrderID": 123},
+            request_info={"ip_address": "127.0.0.1"},
+        )
+
+        self.assertTrue(created)
+        self.assertTrue(record.exists())
+
+    def test_cleanup_old_records_disabled(self):
+        """Test cleanup when retention_days is 0 (disabled)"""
+        count = self.WebhookLog.cleanup_old_records(retention_days=0)
+        self.assertEqual(count, 0)
+
+    def test_cleanup_stuck_processing_records_success(self):
+        """Test cleanup stuck processing records actually resets them"""
+        # Create old processing record
+        old_date = datetime.now() - timedelta(minutes=10)
+        old_record = self.WebhookLog.create({
+            "webhook_body": "{}",
+            "status": "processing",
+            "idempotency_key": str(uuid.uuid4()),
+        })
+        # Manually set receive_date to the past
+        self.env.cr.execute(
+            "UPDATE karage_pos_webhook_log SET receive_date = %s WHERE id = %s",
+            (old_date.strftime("%Y-%m-%d %H:%M:%S"), old_record.id)
+        )
+        self.env.cr.commit()
+
+        # Refresh record
+        old_record.invalidate_recordset()
+
+        # Now cleanup with 1 minute timeout
+        count = self.WebhookLog.cleanup_stuck_processing_records(timeout_minutes=1)
+
+        # Should have reset at least 1 record
+        self.assertGreaterEqual(count, 1)
+
+        # Refresh and check status
+        old_record.invalidate_recordset()
+        self.assertEqual(old_record.status, "failed")
+
+
+@tagged("post_install", "-at_install", "api_controller_full_coverage")
+class TestAPIControllerFullCoverage(TransactionCase, KaragePosTestCommon):
+    """Full coverage tests for API controller - covers remaining missing lines"""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.setup_common()
+
+    def setUp(self):
+        super().setUp()
+        from odoo.addons.karage_pos.controllers.api_controller import APIController
+        self.controller = APIController()
+
+    def _create_mock_request(self, data=None, headers=None, method="POST"):
+        """Create a mock request object with configurable method"""
+        mock_req = MockRequest(self.env, data, headers)
+        mock_req.httprequest.method = method
+        return mock_req
+
+    # ========== Tests for webhook_pos_order endpoint (lines 275-366) ==========
+
+    def test_webhook_pos_order_full_flow_success(self):
+        """Test complete webhook_pos_order flow with valid API key and data"""
+        data = {
+            "OrderID": 10001,
+            "OrderStatus": 103,
+            "AmountPaid": "100.0",
+            "AmountTotal": 100.0,
+            "GrandTotal": 100.0,
+            "Tax": 0.0,
+            "TaxPercent": 0.0,
+            "Idempotency-Key": str(uuid.uuid4()),
+            "OrderItems": [{
+                "OdooItemID": self.product1.id,
+                "ItemName": self.product1.name,
+                "Price": 100.0,
+                "Quantity": 1,
+                "DiscountAmount": 0.0,
+            }],
+            "CheckoutDetails": [{
+                "PaymentMode": 1,
+                "AmountPaid": "100.0",
+                "CardType": "Cash",
+            }],
+        }
+
+        mock_request = self._create_mock_request(
+            data=data,
+            headers={"X-API-KEY": self.api_key}
+        )
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            response = self.controller.webhook_pos_order()
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_webhook_pos_order_missing_fields(self):
+        """Test webhook_pos_order with missing required fields"""
+        data = {
+            "OrderID": 10002,
+            # Missing OrderItems, CheckoutDetails, AmountTotal, AmountPaid
+        }
+
+        mock_request = self._create_mock_request(
+            data=data,
+            headers={"X-API-KEY": self.api_key}
+        )
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            response = self.controller.webhook_pos_order()
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_webhook_pos_order_order_processing_error(self):
+        """Test webhook_pos_order when order processing returns an error"""
+        data = {
+            "OrderID": 10003,
+            "OrderStatus": 999,  # Invalid status
+            "AmountPaid": "100.0",
+            "AmountTotal": 100.0,
+            "GrandTotal": 100.0,
+            "Tax": 0.0,
+            "TaxPercent": 0.0,
+            "OrderItems": [{
+                "OdooItemID": self.product1.id,
+                "ItemName": self.product1.name,
+                "Price": 100.0,
+                "Quantity": 1,
+                "DiscountAmount": 0.0,
+            }],
+            "CheckoutDetails": [{
+                "PaymentMode": 1,
+                "AmountPaid": "100.0",
+                "CardType": "Cash",
+            }],
+        }
+
+        # Set valid statuses to only accept 103
+        self.env["ir.config_parameter"].sudo().set_param(
+            "karage_pos.valid_order_statuses", "103"
+        )
+
+        mock_request = self._create_mock_request(
+            data=data,
+            headers={"X-API-KEY": self.api_key}
+        )
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            response = self.controller.webhook_pos_order()
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_webhook_pos_order_idempotency_cached_response(self):
+        """Test webhook_pos_order returns cached response for duplicate request"""
+        idem_key = str(uuid.uuid4())
+
+        # Create completed idempotency record with cached response
+        self.env["karage.pos.webhook.log"].create({
+            "webhook_body": "{}",
+            "idempotency_key": idem_key,
+            "status": "completed",
+            "response_data": '{"id": 123, "name": "POS/001"}',
+        })
+
+        data = {
+            "OrderID": 10004,
+            "OrderStatus": 103,
+            "AmountPaid": "100.0",
+            "AmountTotal": 100.0,
+            "GrandTotal": 100.0,
+            "Tax": 0.0,
+            "TaxPercent": 0.0,
+            "IdempotencyKey": idem_key,
+            "OrderItems": [{
+                "OdooItemID": self.product1.id,
+                "ItemName": self.product1.name,
+                "Price": 100.0,
+                "Quantity": 1,
+                "DiscountAmount": 0.0,
+            }],
+            "CheckoutDetails": [{
+                "PaymentMode": 1,
+                "AmountPaid": "100.0",
+                "CardType": "Cash",
+            }],
+        }
+
+        mock_request = self._create_mock_request(
+            data=data,
+            headers={"X-API-KEY": self.api_key}
+        )
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            response = self.controller.webhook_pos_order()
+
+        # Should return cached response
+        self.assertEqual(response.status_code, 200)
+
+    # ========== Tests for API key authentication (lines 145-150) ==========
+
+    def test_authenticate_api_key_valid(self):
+        """Test authentication with valid API key returns success"""
+        # Create an API key for the user
+        api_key_obj = self.env["res.users.apikeys"].create({
+            "name": "Test API Key",
+            "user_id": self.user.id,
+            "scope": "rpc",
+        })
+        # Get the actual key value
+        actual_key = api_key_obj._generate()
+
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            success, error = self.controller._authenticate_api_key(actual_key)
+
+        self.assertTrue(success)
+        self.assertIsNone(error)
+
+    def test_authenticate_api_key_exception_handling(self):
+        """Test authentication handles exceptions gracefully (lines 148-150)"""
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            with patch.object(
+                self.env["res.users.apikeys"].__class__, '_check_credentials',
+                side_effect=Exception("DB error")
+            ):
+                success, error = self.controller._authenticate_api_key("any-key")
+
+        self.assertFalse(success)
+        self.assertIn("Invalid or missing API key", error)
+
+    # ========== Tests for _update_log exception handling (lines 83-84) ==========
+
+    def test_update_log_exception_handling(self):
+        """Test _update_log handles exceptions gracefully"""
+        log = self.env["karage.pos.webhook.log"].create({
+            "webhook_body": "{}",
+            "status": "pending",
+            "idempotency_key": str(uuid.uuid4()),
+        })
+
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            with patch.object(log, 'update_log_result', side_effect=Exception("DB error")):
+                # Should not raise, just log warning
+                self.controller._update_log(
+                    log, 200, "Success", success=True, start_time=datetime.now().timestamp()
+                )
+
+    # ========== Tests for _error_response exception handling (lines 102-103) ==========
+
+    def test_error_response_idempotency_mark_failed_exception(self):
+        """Test _error_response handles idempotency mark_failed exception"""
+        idem_record = self.env["karage.pos.webhook.log"].create({
+            "webhook_body": "{}",
+            "status": "processing",
+            "idempotency_key": str(uuid.uuid4()),
+        })
+
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            with patch.object(idem_record, 'mark_failed', side_effect=Exception("DB error")):
+                response = self.controller._error_response(
+                    500, "Internal error", idempotency_record=idem_record
+                )
+
+        self.assertEqual(response.status_code, 500)
+
+    # ========== Tests for _check_idempotency fallback response (lines 200-204, 247) ==========
+
+    def test_check_idempotency_completed_fallback_response(self):
+        """Test idempotency returns fallback response when no cached data"""
+        # Create completed record without response_data
+        fallback_key = str(uuid.uuid4())
+        self.env["karage.pos.webhook.log"].create({
+            "webhook_body": "{}",
+            "idempotency_key": fallback_key,
+            "status": "completed",
+            "response_data": None,  # No cached response
+        })
+
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            should_process, result = self.controller._check_idempotency(
+                fallback_key, "123", None, datetime.now().timestamp()
+            )
+
+        self.assertFalse(should_process)
+        # Result should be a response object
+
+    def test_check_idempotency_unknown_status(self):
+        """Test idempotency handles unknown status (line 247)"""
+        # Create record with unusual status via direct SQL
+        unknown_key = str(uuid.uuid4())
+        record = self.env["karage.pos.webhook.log"].create({
+            "webhook_body": "{}",
+            "idempotency_key": unknown_key,
+            "status": "pending",  # Start with valid status
+        })
+        # Force an unexpected status value
+        self.env.cr.execute(
+            "UPDATE karage_pos_webhook_log SET status = 'unknown' WHERE id = %s",
+            (record.id,)
+        )
+
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            should_process, result = self.controller._check_idempotency(
+                unknown_key, "123", None, datetime.now().timestamp()
+            )
+
+        # Should return True and the record for unknown statuses
+        self.assertTrue(should_process)
+
+    # ========== Tests for bulk endpoint edge cases (lines 396-493, 526, 540-542) ==========
+
+    def test_webhook_pos_order_bulk_with_webhook_log(self):
+        """Test bulk endpoint creates and updates webhook log"""
+        orders_data = [{
+            "OrderID": 10100,
+            "OrderStatus": 103,
+            "AmountPaid": "100.0",
+            "AmountTotal": 100.0,
+            "GrandTotal": 100.0,
+            "Tax": 0.0,
+            "TaxPercent": 0.0,
+            "OrderItems": [{
+                "OdooItemID": self.product1.id,
+                "ItemName": self.product1.name,
+                "Price": 100.0,
+                "Quantity": 1,
+                "DiscountAmount": 0.0,
+            }],
+            "CheckoutDetails": [{
+                "PaymentMode": 1,
+                "AmountPaid": "100.0",
+                "CardType": "Cash",
+            }],
+        }]
+
+        mock_request = self._create_mock_request(
+            data={"orders": orders_data},
+            headers={"X-API-KEY": self.api_key}
+        )
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            response = self.controller.webhook_pos_order_bulk()
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_process_bulk_orders_with_order_error(self):
+        """Test _process_bulk_orders handles order processing error (line 526)"""
+        orders_data = [{
+            "OrderID": 10200,
+            "OrderStatus": 103,
+            "AmountPaid": "100.0",
+            "AmountTotal": 100.0,
+            "GrandTotal": 100.0,
+            "Tax": 0.0,
+            "TaxPercent": 0.0,
+            "OrderItems": [{
+                "OdooItemID": 99999,  # Non-existent product
+                "ItemName": "Non-existent",
+                "Price": 100.0,
+                "Quantity": 1,
+                "DiscountAmount": 0.0,
+            }],
+            "CheckoutDetails": [{
+                "PaymentMode": 1,
+                "AmountPaid": "100.0",
+                "CardType": "Cash",
+            }],
+        }]
+
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            results = self.controller._process_bulk_orders(orders_data)
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["status"], "error")
+
+    def test_process_bulk_orders_exception_in_order(self):
+        """Test _process_bulk_orders handles exception in order processing (lines 540-542)"""
+        orders_data = [{
+            "OrderID": 10201,
+            "OrderStatus": 103,
+            "AmountPaid": "100.0",
+            "AmountTotal": 100.0,
+            "GrandTotal": 100.0,
+            "Tax": 0.0,
+            "TaxPercent": 0.0,
+            "OrderItems": [{
+                "OdooItemID": self.product1.id,
+                "ItemName": self.product1.name,
+                "Price": 100.0,
+                "Quantity": 1,
+                "DiscountAmount": 0.0,
+            }],
+            "CheckoutDetails": [{
+                "PaymentMode": 1,
+                "AmountPaid": "100.0",
+                "CardType": "Cash",
+            }],
+        }]
+
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            with patch.object(
+                self.controller, '_process_pos_order',
+                side_effect=Exception("Unexpected error in processing")
+            ):
+                results = self.controller._process_bulk_orders(orders_data)
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["status"], "error")
+        self.assertIn("Unexpected error", results[0]["error"])
+
+    # ========== Tests for payment method validation (lines 570, 579, 1044, 1053) ==========
+
+    def test_process_pos_order_no_payment_methods_configured(self):
+        """Test _process_pos_order handles no payment methods (line 570)"""
+        # Create a POS config without payment methods
+        empty_config = self.env["pos.config"].create({
+            "name": "Empty Payment Config",
+            "payment_method_ids": [(5, 0, 0)],  # Remove all payment methods
+        })
+        empty_session = self.env["pos.session"].create({
+            "config_id": empty_config.id,
+            "user_id": self.env.user.id,
+        })
+
+        data = {
+            "OrderID": 10300,
+            "OrderStatus": 103,
+            "AmountPaid": "100.0",
+            "AmountTotal": 100.0,
+            "GrandTotal": 100.0,
+            "Tax": 0.0,
+            "TaxPercent": 0.0,
+            "OrderItems": [{
+                "OdooItemID": self.product1.id,
+                "ItemName": self.product1.name,
+                "Price": 100.0,
+                "Quantity": 1,
+                "DiscountAmount": 0.0,
+            }],
+            "CheckoutDetails": [{
+                "PaymentMode": 1,
+                "AmountPaid": "100.0",
+                "CardType": "Cash",
+            }],
+        }
+
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            with patch.object(
+                self.controller, '_get_or_create_external_session',
+                return_value=empty_session
+            ):
+                pos_order, error = self.controller._process_pos_order(data)
+
+        self.assertIsNone(pos_order)
+        self.assertIsNotNone(error)
+        self.assertIn("No payment method", error["message"])
+
+    def test_prepare_payment_lines_cash_fallback(self):
+        """Test _prepare_payment_lines uses cash fallback for payment mode 1 (line 1044)"""
+        checkout_details = [{
+            "PaymentMode": 1,  # Cash
+            "AmountPaid": "100.0",
+            "CardType": "UnknownType",  # Won't match by CardType
+        }]
+
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            lines, error = self.controller._prepare_payment_lines(
+                checkout_details, self.pos_session, 100.0, 0.01
+            )
+
+        # Should find cash payment method via is_cash_count fallback
+        self.assertIsNone(error)
+        self.assertEqual(len(lines), 1)
+
+    def test_prepare_payment_lines_journal_missing(self):
+        """Test _prepare_payment_lines handles missing journal (line 1053)"""
+        # Create payment method without journal
+        no_journal_method = self.env["pos.payment.method"].create({
+            "name": "NoJournalMethod",
+            "company_id": self.company.id,
+            "is_cash_count": False,
+        })
+
+        # Create a session with only this payment method
+        test_config = self.env["pos.config"].create({
+            "name": "Test No Journal Config",
+            "payment_method_ids": [(6, 0, [no_journal_method.id])],
+        })
+        test_session = self.env["pos.session"].create({
+            "config_id": test_config.id,
+            "user_id": self.env.user.id,
+        })
+
+        checkout_details = [{
+            "PaymentMode": 999,
+            "AmountPaid": "100.0",
+            "CardType": "NoJournalMethod",
+        }]
+
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            lines, error = self.controller._prepare_payment_lines(
+                checkout_details, test_session, 100.0, 0.01
+            )
+
+        self.assertIsNone(lines)
+        self.assertIsNotNone(error)
+
+    # ========== Tests for order line validation error (lines 657, 664, 965) ==========
+
+    def test_prepare_order_lines_validation_error(self):
+        """Test _prepare_order_lines handles product validation error (line 965)"""
+        # Create inactive product
+        inactive_product = self.env["product.product"].create({
+            "name": "Inactive Product",
+            "active": False,
+            "sale_ok": True,
+            "available_in_pos": True,
+        })
+
+        order_items = [{
+            "OdooItemID": inactive_product.id,
+            "ItemID": 0,
+            "ItemName": "Inactive Product",
+            "Price": 100.0,
+            "Quantity": 1,
+            "DiscountAmount": 0.0,
+        }]
+
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            lines, error = self.controller._prepare_order_lines(order_items, self.pos_session)
+
+        self.assertIsNone(lines)
+        self.assertIsNotNone(error)
+        self.assertEqual(error["status"], 400)
+
+    # ========== Tests for picking creation (lines 716-717) ==========
+
+    def test_process_pos_order_picking_exception_logged(self):
+        """Test _process_pos_order logs picking creation exception (lines 716-717)"""
+        data = {
+            "OrderID": 10400,
+            "OrderStatus": 103,
+            "AmountPaid": "100.0",
+            "AmountTotal": 100.0,
+            "GrandTotal": 100.0,
+            "Tax": 0.0,
+            "TaxPercent": 0.0,
+            "OrderItems": [{
+                "OdooItemID": self.product1.id,
+                "ItemName": self.product1.name,
+                "Price": 100.0,
+                "Quantity": 1,
+                "DiscountAmount": 0.0,
+            }],
+            "CheckoutDetails": [{
+                "PaymentMode": 1,
+                "AmountPaid": "100.0",
+                "CardType": "Cash",
+            }],
+        }
+
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            # Patch _create_order_picking to raise exception
+            original_method = self.env["pos.order"].__class__._create_order_picking
+
+            def raise_picking_error(self):
+                raise Exception("Picking creation failed")
+
+            with patch.object(
+                self.env["pos.order"].__class__, '_create_order_picking', raise_picking_error
+            ):
+                pos_order, error = self.controller._process_pos_order(data)
+
+        # Order should still be created successfully
+        self.assertIsNone(error)
+        self.assertIsNotNone(pos_order)
+
+    # ========== Tests for general exception in _process_pos_order (lines 721-723) ==========
+
+    def test_process_pos_order_general_exception_logged(self):
+        """Test _process_pos_order handles general exception (lines 721-723)"""
+        data = {
+            "OrderID": 10500,
+            "OrderStatus": 103,
+            "AmountPaid": "100.0",
+            "AmountTotal": 100.0,
+            "GrandTotal": 100.0,
+            "Tax": 0.0,
+            "TaxPercent": 0.0,
+            "OrderItems": [{
+                "OdooItemID": self.product1.id,
+                "ItemName": self.product1.name,
+                "Price": 100.0,
+                "Quantity": 1,
+                "DiscountAmount": 0.0,
+            }],
+            "CheckoutDetails": [{
+                "PaymentMode": 1,
+                "AmountPaid": "100.0",
+                "CardType": "Cash",
+            }],
+        }
+
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            with patch.object(
+                self.env["pos.order"].__class__, 'create',
+                side_effect=Exception("Order creation failed")
+            ):
+                pos_order, error = self.controller._process_pos_order(data)
+
+        self.assertIsNone(pos_order)
+        self.assertIsNotNone(error)
+        self.assertEqual(error["status"], 500)
+
+    # ========== Tests for session creation (lines 770-771, 815-817) ==========
+
+    def test_get_or_create_external_session_logs_existing(self):
+        """Test _get_or_create_external_session logs when using existing session (lines 770-771)"""
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            session = self.controller._get_or_create_external_session()
+
+        self.assertIsNotNone(session)
+        self.assertIn(session.state, ["opened", "opening_control"])
+
+    def test_get_or_create_external_session_creation_exception_logged(self):
+        """Test _get_or_create_external_session logs session creation exception (lines 815-817)"""
+        # Close all existing sessions
+        self.env["pos.session"].search([
+            ("state", "in", ["opened", "opening_control"])
+        ]).write({"state": "closed", "stop_at": fields.Datetime.now()})
+
+        mock_request = self._create_mock_request()
+        mock_request.env = self.env
+
+        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
+            with patch.object(
+                self.env["pos.session"].__class__, 'create',
+                side_effect=Exception("Session creation failed")
+            ):
+                session = self.controller._get_or_create_external_session()
+
+        # Should return None when creation fails
+        self.assertIsNone(session)
