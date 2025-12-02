@@ -79,16 +79,11 @@ git checkout "$SOURCE_BRANCH" -- "$MODULE_DIR/"
 
 # Apply version-specific transformations
 if [[ "$VERSION" == "17.0" ]]; then
-    echo "Applying Odoo 17 transformations..."
-
-    # Transform version in manifest
-    sed -i 's/"version": "18\.0/"version": "17.0/' "$MODULE_DIR/__manifest__.py"
-
-    # Transform list -> tree in XML views
-    sed -i 's/<list /<tree /g; s/<\/list>/<\/tree>/g' "$MODULE_DIR/views/webhook_log_views.xml"
-
-    echo "  - Updated version to 17.0.x.x"
-    echo "  - Converted <list> to <tree> in views"
+    # Use centralized transform script (restore it first since orphan branch is empty)
+    git checkout "$SOURCE_BRANCH" -- scripts/transform_odoo17.sh
+    ./scripts/transform_odoo17.sh "$MODULE_DIR"
+    # Remove scripts dir - not needed for deployment
+    rm -rf scripts/
 fi
 
 # Stage and commit
