@@ -144,7 +144,8 @@ class KaragePosTestCommon:
 
         # Create a real API key for test user using Odoo's API key system
         # In Odoo 18, _generate takes (scope, name, expiration_date)
-        expiration = fields.Datetime.now() + timedelta(days=365)
+        # Use 1 day expiration to stay within default limits
+        expiration = fields.Datetime.now() + timedelta(days=1)
         cls.api_key = cls.env["res.users.apikeys"].with_user(cls.user)._generate(
             scope="rpc",
             name="Test API Key",
