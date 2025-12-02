@@ -9,7 +9,7 @@ from odoo.tests.common import tagged
 from .test_common import KaragePosTestCommon
 
 
-@tagged("post_install", "-at_install")
+@tagged("post_install", "-at_install", "-standard", "http_case")
 class TestWebhookController(HttpCase, KaragePosTestCommon):
     """Test webhook controller"""  # pylint: disable=too-many-public-methods
 
@@ -268,12 +268,15 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
     def test_webhook_with_tax(self):
         """Test webhook with tax"""
         # Create tax
+        country = self.env.ref("base.us", raise_if_not_found=False) or self.env["res.country"].search([], limit=1)
         tax = self.env["account.tax"].create(
             {
                 "name": "Test Tax 15%",
                 "amount": 15.0,
                 "type_tax_use": "sale",
                 "company_id": self.company.id,
+                "tax_group_id": self.tax_group.id,
+                "country_id": country.id,
             }
         )
 

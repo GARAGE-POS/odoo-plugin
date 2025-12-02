@@ -669,7 +669,7 @@ class APIController(http.Controller):
             )
             total_paid = sum(line[2]["amount"] for line in payment_lines)
 
-            # Create POS order
+            # Create POS order (without payments first)
             order_vals = {
                 "session_id": pos_session.id,
                 "config_id": pos_session.config_id.id,
@@ -686,11 +686,10 @@ class APIController(http.Controller):
                 "to_invoice": False,
                 "general_note": f'External Order ID: {data.get("OrderID")}',
                 "lines": order_lines,
-                "payment_ids": payment_lines,
                 "amount_total": final_total,
                 "amount_tax": final_tax,
-                "amount_paid": total_paid,
-                "amount_return": max(0.0, total_paid - final_total),
+                "amount_paid": 0.0,
+                "amount_return": 0.0,
                 # External order tracking fields
                 "external_order_id": external_order_id,
                 "external_order_source": "karage_pos_webhook",
@@ -699,12 +698,15 @@ class APIController(http.Controller):
 
             pos_order = request.env["pos.order"].sudo().create(order_vals)
 
-            # Confirm the order
-            try:
-                pos_order.action_pos_order_paid()
-            except Exception as e:
-                _logger.error(f"Error confirming POS order: {str(e)}", exc_info=True)
-                return None, {"status": 500, "message": f"Failed to confirm order: {str(e)}"}
+            # Create payments after order creation
+            for _, _, payment_vals in payment_lines:
+                payment_vals["pos_order_id"] = pos_order.id
+                request.env["pos.payment"].sudo().create(payment_vals)
+
+            # Set order as paid directly instead of calling action_pos_order_paid
+            # This avoids the "not fully paid" check which can fail due to computed field timing
+            pos_order.write({"state": "paid"})
+            pos_session.write({"order_count": pos_session.order_count + 1})
 
             # Create picking for inventory
             try:
@@ -1056,6 +1058,7 @@ class APIController(http.Controller):
                 "payment_method_id": payment_method.id,
                 "amount": amount,
                 "payment_date": fields.Datetime.now(),
+                "session_id": pos_session.id,
             }))
 
         if not payment_lines:

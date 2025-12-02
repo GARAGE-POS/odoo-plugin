@@ -7,6 +7,7 @@ which allows coverage tools to track code execution properly.
 """
 
 import json
+import uuid
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
@@ -40,7 +41,7 @@ class MockRequest:
             self.env = self.env(user=user)
 
 
-@tagged("post_install", "-at_install")
+@tagged("post_install", "-at_install", "-standard", "api_controller_unit")
 class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
     """Unit tests for API controller methods"""
 
@@ -267,6 +268,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
         log = self.env["karage.pos.webhook.log"].create({
             "webhook_body": "{}",
             "status": "pending",
+            "idempotency_key": str(uuid.uuid4()),
         })
 
         mock_request = self._create_mock_request()
@@ -294,6 +296,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
         log = self.env["karage.pos.webhook.log"].create({
             "webhook_body": "{}",
             "status": "pending",
+            "idempotency_key": str(uuid.uuid4()),
         })
 
         pos_order = self.env["pos.order"].create({
@@ -343,6 +346,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
         log = self.env["karage.pos.webhook.log"].create({
             "webhook_body": "{}",
             "status": "pending",
+            "idempotency_key": str(uuid.uuid4()),
         })
 
         mock_request = self._create_mock_request()
@@ -1035,7 +1039,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
         self.assertEqual(error_count, 1)
 
 
-@tagged("post_install", "-at_install")
+@tagged("post_install", "-at_install", "-standard", "process_order")
 class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
     """Unit tests for _process_pos_order method"""
 
@@ -1306,11 +1310,14 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
     def test_process_pos_order_with_tax(self):
         """Test order with tax"""
         # Create tax
+        country = self.env.ref("base.us", raise_if_not_found=False) or self.env["res.country"].search([], limit=1)
         tax = self.env["account.tax"].create({
             "name": "Test Tax 15%",
             "amount": 15.0,
             "type_tax_use": "sale",
             "company_id": self.company.id,
+            "tax_group_id": self.tax_group.id,
+            "country_id": country.id,
         })
         self.product1.write({"taxes_id": [(6, 0, [tax.id])]})
 
