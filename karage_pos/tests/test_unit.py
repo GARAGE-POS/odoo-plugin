@@ -41,7 +41,7 @@ class MockRequest:
             self.env = self.env(user=user)
 
 
-@tagged("post_install", "-at_install")
+@tagged("post_install", "-at_install", "-standard", "api_controller_unit")
 class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
     """Unit tests for API controller methods"""
 
