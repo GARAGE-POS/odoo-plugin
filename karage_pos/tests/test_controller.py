@@ -268,6 +268,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
     def test_webhook_with_tax(self):
         """Test webhook with tax"""
         # Create tax
+        country = self.env.ref("base.us", raise_if_not_found=False) or self.env["res.country"].search([], limit=1)
         tax = self.env["account.tax"].create(
             {
                 "name": "Test Tax 15%",
@@ -275,6 +276,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
                 "type_tax_use": "sale",
                 "company_id": self.company.id,
                 "tax_group_id": self.tax_group.id,
+                "country_id": country.id,
             }
         )
 

@@ -1306,12 +1306,14 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
     def test_process_pos_order_with_tax(self):
         """Test order with tax"""
         # Create tax
+        country = self.env.ref("base.us", raise_if_not_found=False) or self.env["res.country"].search([], limit=1)
         tax = self.env["account.tax"].create({
             "name": "Test Tax 15%",
             "amount": 15.0,
             "type_tax_use": "sale",
             "company_id": self.company.id,
             "tax_group_id": self.tax_group.id,
+            "country_id": country.id,
         })
         self.product1.write({"taxes_id": [(6, 0, [tax.id])]})
 

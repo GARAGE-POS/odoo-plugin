@@ -669,7 +669,7 @@ class APIController(http.Controller):
             )
             total_paid = sum(line[2]["amount"] for line in payment_lines)
 
-            # Create POS order
+            # Create POS order (without payments first)
             order_vals = {
                 "session_id": pos_session.id,
                 "config_id": pos_session.config_id.id,
@@ -686,11 +686,10 @@ class APIController(http.Controller):
                 "to_invoice": False,
                 "general_note": f'External Order ID: {data.get("OrderID")}',
                 "lines": order_lines,
-                "payment_ids": payment_lines,
                 "amount_total": final_total,
                 "amount_tax": final_tax,
-                "amount_paid": total_paid,
-                "amount_return": max(0.0, total_paid - final_total),
+                "amount_paid": 0.0,
+                "amount_return": 0.0,
                 # External order tracking fields
                 "external_order_id": external_order_id,
                 "external_order_source": "karage_pos_webhook",
@@ -698,6 +697,11 @@ class APIController(http.Controller):
             }
 
             pos_order = request.env["pos.order"].sudo().create(order_vals)
+
+            # Create payments after order creation
+            for _, _, payment_vals in payment_lines:
+                payment_vals["pos_order_id"] = pos_order.id
+                request.env["pos.payment"].sudo().create(payment_vals)
 
             # Confirm the order
             try:
