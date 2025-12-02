@@ -1,120 +1,135 @@
 # Odoo Marketplace Deployment Guide
 
-## Prerequisites
+## Overview
 
-- Ensure you have read the [Vendor Guidelines](https://apps.odoo.com/apps/vendor-guidelines)
-- Module must be inside a folder named after the module (e.g., `karage_pos/`) at the repository root
-- Repository must be accessible (public or Odoo has deploy key access)
+This repository uses a **single-source, multi-target** deployment strategy:
 
-## Branch Naming Convention
+- **Development** happens on `main` branch using Odoo 18 syntax
+- **Deployment branches** (`18.0`, `17.0`) contain only the module folder
+- **Automated transformations** convert Odoo 18 code to Odoo 17 compatibility
 
-The branch name must exactly match the Odoo series version. For Odoo 18.0, use branch `18.0`.
+```
+main (development)
+  │
+  ├──► 18.0 branch (direct copy)
+  │
+  └──► 17.0 branch (with transformations)
+```
 
-## Deployment Commands
+## Quick Start
 
-The `18.0` branch contains only the `karage_pos` module folder (not the development files like tests configs, CI/CD, etc.).
-
-### Initial Deployment
+### Deploy to Both Versions
 
 ```bash
-# 1. Create an orphan branch (no history from main)
-git checkout --orphan 18.0-temp
-
-# 2. Remove all files from staging
-git rm -rf .
-
-# 3. Restore only the karage_pos folder from main
-git checkout main -- karage_pos/
-
-# 4. Stage and commit
-git add karage_pos/
-git commit -m "Karage POS Integration module for Odoo 18.0"
-
-# 5. Delete old 18.0 branch if it exists and rename
-git branch -D 18.0 2>/dev/null
-git branch -m 18.0-temp 18.0
-
-# 6. Push to remote (force to overwrite)
-git push origin 18.0 --force
-
-# 7. Switch back to main
+# Make sure you're on main with latest changes
 git checkout main
+git pull origin main
+
+# Deploy to Odoo 18 (direct copy)
+PRE_COMMIT_ALLOW_NO_CONFIG=1 ./deploy.sh 18.0
+
+# Deploy to Odoo 17 (with transformations)
+PRE_COMMIT_ALLOW_NO_CONFIG=1 ./deploy.sh 17.0
 ```
 
-### Updating the Module (Future Releases)
-
-When you need to push updates after making changes on `main`:
+### Preview Changes (Dry Run)
 
 ```bash
-# 1. Commit your changes to the main branch first
-git add karage_pos/
-git commit -m "Update Karage POS Integration"
-
-# 2. Switch to 18.0 branch
-git checkout 18.0
-
-# 3. Update karage_pos folder from main
-git checkout main -- karage_pos/
-
-# 4. Commit and push
-git add karage_pos/
-git commit -m "Update Karage POS Integration"
-git push origin 18.0
-
-# 5. Switch back to main
-git checkout main
+./deploy.sh 17.0 --dry-run
+./deploy.sh 18.0 --dry-run
 ```
 
-## Multi-Version Deployment
+## Branch Structure
 
-This module supports both Odoo 17 and Odoo 18. Each version requires its own deployment branch.
+| Branch | Purpose | Odoo Version | Contains |
+|--------|---------|--------------|----------|
+| `main` | Development | 18.0 syntax | Full repo (CI, tests, scripts, module) |
+| `18.0` | Deployment | 18.0 | Only `karage_pos/` folder |
+| `17.0` | Deployment | 17.0 | Only `karage_pos/` folder (transformed) |
 
-| Odoo Version | Branch | Version in manifest |
-|--------------|--------|---------------------|
-| 18.0 | `18.0` | `18.0.0.1` |
-| 17.0 | `17.0` | `17.0.0.1` |
+## Multi-Version Support
 
-### Version Differences
+### Supported Versions
 
-The following files need modification for Odoo 17 compatibility:
+| Odoo Version | Branch | Manifest Version | Python | Status |
+|--------------|--------|------------------|--------|--------|
+| 18.0 | `18.0` | `18.0.0.1` | 3.11+ | ✅ Primary |
+| 17.0 | `17.0` | `17.0.0.1` | 3.10+ | ✅ Supported |
 
-1. **`__manifest__.py`**: Version string must start with `17.0.`
-2. **`views/webhook_log_views.xml`**: Replace `<list>` with `<tree>` (Odoo 17 syntax)
+### Odoo 17 Transformations
 
-### Deploying to Odoo 17
+The `scripts/transform_odoo17.sh` script automatically applies these changes:
 
-Use the deployment script to automatically transform and deploy:
+| File | Transformation | Reason |
+|------|----------------|--------|
+| `__manifest__.py` | `18.0.x.x` → `17.0.x.x` | Version must match Odoo series |
+| `views/webhook_log_views.xml` | `<list>` → `<tree>` | Odoo 17 uses `tree`, Odoo 18 uses `list` |
+| `tests/test_models.py` | Version assertions updated | Tests check correct version |
+
+### Code Compatibility
+
+The module code handles version differences at runtime:
+
+```python
+# Example: general_note field only exists in Odoo 18+
+pos_order_model = request.env["pos.order"]
+if "general_note" in pos_order_model._fields:
+    order_vals["general_note"] = f'External Order ID: {order_id}'
+```
+
+## Deployment Script Reference
+
+### Usage
 
 ```bash
-./deploy.sh 17.0
+./deploy.sh <version> [--dry-run]
 ```
 
-Or manually:
+### Arguments
 
-```bash
-# 1. Create/switch to 17.0 branch
-git checkout --orphan 17.0-temp || git checkout 17.0-temp
-git rm -rf .
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `version` | Yes | Target Odoo version: `17.0` or `18.0` |
+| `--dry-run` | No | Preview changes without deploying |
 
-# 2. Restore karage_pos from main
-git checkout main -- karage_pos/
+### What the Script Does
 
-# 3. Transform for Odoo 17
-sed -i 's/"version": "18.0/"version": "17.0/' karage_pos/__manifest__.py
-sed -i 's/<list /<tree /g; s/<\/list>/<\/tree>/g' karage_pos/views/webhook_log_views.xml
+1. Creates an orphan branch (no git history)
+2. Copies only `karage_pos/` from `main`
+3. For Odoo 17: runs transformation script
+4. Commits and force-pushes to target branch
+5. Returns to original branch
 
-# 4. Commit and deploy
-git add karage_pos/
-git commit -m "Karage POS Integration module for Odoo 17.0"
-git branch -D 17.0 2>/dev/null
-git branch -m 17.0-temp 17.0
-git push origin 17.0 --force
-git checkout main
+### Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `PRE_COMMIT_ALLOW_NO_CONFIG=1` | Bypass pre-commit hooks (deployment branches have no config) |
+
+## CI/CD Pipeline
+
+### Automated Testing
+
+The CI runs tests against both Odoo versions on every push to `main`:
+
+```yaml
+# .github/workflows/coverage.yml
+strategy:
+  matrix:
+    odoo_version: ['18.0', '17.0']
 ```
 
-## Repository URL Format
+For Odoo 17 tests, the CI automatically applies transformations before running tests.
 
-When registering your Git repository on Odoo Apps, use this format:
+### Test Results
+
+Both versions must pass before merging to `main`.
+
+## Odoo Apps Marketplace
+
+### Repository URLs
+
+When registering on [Odoo Apps](https://apps.odoo.com/):
 
 **Odoo 18:**
 ```
@@ -126,14 +141,89 @@ ssh://git@github.com/GARAGE-POS/odoo-plugin.git#18.0
 ssh://git@github.com/GARAGE-POS/odoo-plugin.git#17.0
 ```
 
-## Checklist Before Submission
+### Submission Checklist
 
-- [ ] Branch name matches Odoo version (`18.0`)
-- [ ] Module is inside a folder named `karage_pos/` at repository root
-- [ ] `__manifest__.py` has correct version format (`18.0.x.x.x`)
-- [ ] `__manifest__.py` has valid license (`LGPL-3` or `OPL-1`)
-- [ ] `static/description/index.html` exists with module description
+Before submitting to Odoo Apps:
+
+- [ ] Branch name matches Odoo version (`18.0` or `17.0`)
+- [ ] Module folder is `karage_pos/` at repository root
+- [ ] `__manifest__.py` version starts with correct Odoo series
+- [ ] `__manifest__.py` has valid license (`LGPL-3`)
+- [ ] `static/description/index.html` exists
 - [ ] `static/description/icon.png` exists (module icon)
-- [ ] `static/description/banner.png` exists (cover image, recommended 1024x500px)
-- [ ] No `__pycache__` directories in repository
-- [ ] All dependencies in `depends` list are valid Odoo modules
+- [ ] `static/description/banner.png` exists (1024x500px recommended)
+- [ ] No `__pycache__` directories
+- [ ] All `depends` are valid Odoo modules
+
+## Manual Deployment (Alternative)
+
+If you prefer not to use the deployment script:
+
+### Deploy Odoo 18
+
+```bash
+git checkout --orphan 18.0-temp
+git rm -rf .
+git checkout main -- karage_pos/
+git add karage_pos/
+git commit -m "Karage POS Integration module for Odoo 18.0"
+git branch -D 18.0 2>/dev/null || true
+git branch -m 18.0-temp 18.0
+git push origin 18.0 --force
+git checkout main
+```
+
+### Deploy Odoo 17
+
+```bash
+git checkout --orphan 17.0-temp
+git rm -rf .
+git checkout main -- karage_pos/
+git checkout main -- scripts/transform_odoo17.sh
+./scripts/transform_odoo17.sh karage_pos
+rm -rf scripts/
+git add karage_pos/
+git commit -m "Karage POS Integration module for Odoo 17.0"
+git branch -D 17.0 2>/dev/null || true
+git branch -m 17.0-temp 17.0
+git push origin 17.0 --force
+git checkout main
+```
+
+## Troubleshooting
+
+### Pre-commit Hook Errors
+
+If you see pre-commit errors during deployment:
+
+```bash
+PRE_COMMIT_ALLOW_NO_CONFIG=1 ./deploy.sh <version>
+```
+
+### Uncommitted Changes Warning
+
+The script warns if you have uncommitted changes. Either:
+- Commit or stash your changes first
+- Type `y` to continue anyway (changes won't affect deployment)
+
+### Force Push Blocked
+
+If force-push is blocked by branch protection:
+- Temporarily disable branch protection for deployment branches
+- Or use a deploy token with bypass permissions
+
+## Adding Support for New Odoo Versions
+
+To add support for a new version (e.g., Odoo 19):
+
+1. **Update CI matrix** in `.github/workflows/coverage.yml`
+2. **Create transformation script** if needed (e.g., `scripts/transform_odoo19.sh`)
+3. **Update `deploy.sh`** to handle the new version
+4. **Test thoroughly** before deploying
+5. **Update this documentation**
+
+## Prerequisites
+
+- Git installed and configured
+- Push access to the repository
+- Read the [Odoo Vendor Guidelines](https://apps.odoo.com/apps/vendor-guidelines)
