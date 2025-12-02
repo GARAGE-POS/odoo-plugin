@@ -9,22 +9,15 @@ from odoo.tests.common import tagged
 from .test_common import KaragePosTestCommon
 
 
-@tagged("post_install", "-at_install", "-standard", "http_case")
+@tagged("post_install", "-at_install", "http_case")
 class TestWebhookController(HttpCase, KaragePosTestCommon):
-    """Test webhook controller via HTTP requests
-
-    Note: These tests are tagged with -standard because HTTP tests in Odoo
-    require committed transactions which are forbidden in the test framework.
-    Run locally against a test database where commits are allowed.
-    """  # pylint: disable=too-many-public-methods
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.setup_common()
+    """Test webhook controller via HTTP requests"""  # pylint: disable=too-many-public-methods
 
     def setUp(self):
         super().setUp()
+        # Setup common data in setUp (not setUpClass) for HttpCase
+        # This ensures data is visible to HTTP requests within transaction
+        self.setup_common()
         self.webhook_url = "/api/v1/webhook/pos-order"
         # Ensure sample_webhook_data has correct product IDs
         if hasattr(self, "sample_webhook_data"):
