@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+from datetime import timedelta
+
+from odoo import fields
 
 
 class KaragePosTestCommon:
@@ -140,13 +143,13 @@ class KaragePosTestCommon:
         cls.pos_session.action_pos_session_open()
 
         # Create a real API key for test user using Odoo's API key system
-        cls.api_key_record = cls.env["res.users.apikeys"].create({
-            "name": "Test API Key",
-            "user_id": cls.user.id,
-            "scope": "rpc",
-        })
-        # Generate the actual key value
-        cls.api_key = cls.api_key_record._generate()
+        # In Odoo 18, _generate takes (scope, name, expiration_date)
+        expiration = fields.Datetime.now() + timedelta(days=365)
+        cls.api_key = cls.env["res.users.apikeys"].with_user(cls.user)._generate(
+            scope="rpc",
+            name="Test API Key",
+            expiration_date=expiration,
+        )
 
         # Sample webhook data
         cls.sample_webhook_data = {
