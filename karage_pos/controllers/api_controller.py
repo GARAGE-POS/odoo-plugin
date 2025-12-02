@@ -78,7 +78,6 @@ class APIController(http.Controller):
                 response_message=message,
                 success=success,
                 pos_order_id=pos_order,
-                idempotency_record_id=idempotency_record,
                 processing_time=time.time() - start_time if start_time else None,
             )
         except Exception as e:
