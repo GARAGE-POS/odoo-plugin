@@ -65,12 +65,65 @@ git push origin 18.0
 git checkout main
 ```
 
+## Multi-Version Deployment
+
+This module supports both Odoo 17 and Odoo 18. Each version requires its own deployment branch.
+
+| Odoo Version | Branch | Version in manifest |
+|--------------|--------|---------------------|
+| 18.0 | `18.0` | `18.0.0.1` |
+| 17.0 | `17.0` | `17.0.0.1` |
+
+### Version Differences
+
+The following files need modification for Odoo 17 compatibility:
+
+1. **`__manifest__.py`**: Version string must start with `17.0.`
+2. **`views/webhook_log_views.xml`**: Replace `<list>` with `<tree>` (Odoo 17 syntax)
+
+### Deploying to Odoo 17
+
+Use the deployment script to automatically transform and deploy:
+
+```bash
+./deploy.sh 17.0
+```
+
+Or manually:
+
+```bash
+# 1. Create/switch to 17.0 branch
+git checkout --orphan 17.0-temp || git checkout 17.0-temp
+git rm -rf .
+
+# 2. Restore karage_pos from main
+git checkout main -- karage_pos/
+
+# 3. Transform for Odoo 17
+sed -i 's/"version": "18.0/"version": "17.0/' karage_pos/__manifest__.py
+sed -i 's/<list /<tree /g; s/<\/list>/<\/tree>/g' karage_pos/views/webhook_log_views.xml
+
+# 4. Commit and deploy
+git add karage_pos/
+git commit -m "Karage POS Integration module for Odoo 17.0"
+git branch -D 17.0 2>/dev/null
+git branch -m 17.0-temp 17.0
+git push origin 17.0 --force
+git checkout main
+```
+
 ## Repository URL Format
 
 When registering your Git repository on Odoo Apps, use this format:
 
+**Odoo 18:**
 ```
 ssh://git@github.com/GARAGE-POS/odoo-plugin.git#18.0
+```
+
+**Odoo 17:**
+```
+ssh://git@github.com/GARAGE-POS/odoo-plugin.git#17.0
 ```
 
 ## Checklist Before Submission
