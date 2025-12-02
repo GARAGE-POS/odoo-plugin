@@ -9,9 +9,9 @@ from odoo.tests.common import tagged
 from .test_common import KaragePosTestCommon
 
 
-@tagged("post_install", "-at_install", "-standard", "http_case")
+@tagged("post_install", "-at_install", "http_case")
 class TestWebhookController(HttpCase, KaragePosTestCommon):
-    """Test webhook controller"""  # pylint: disable=too-many-public-methods
+    """Test webhook controller via HTTP requests"""  # pylint: disable=too-many-public-methods
 
     @classmethod
     def setUpClass(cls):
