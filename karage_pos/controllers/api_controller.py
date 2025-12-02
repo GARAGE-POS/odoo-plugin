@@ -703,6 +703,9 @@ class APIController(http.Controller):
                 payment_vals["pos_order_id"] = pos_order.id
                 request.env["pos.payment"].sudo().create(payment_vals)
 
+            # Invalidate cache to recompute amount_paid
+            pos_order.invalidate_recordset()
+
             # Confirm the order
             try:
                 pos_order.action_pos_order_paid()
