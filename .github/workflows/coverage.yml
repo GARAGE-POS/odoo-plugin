@@ -105,8 +105,8 @@ jobs:
       run: |
         coverage run --source=karage_pos \
           --omit="*/tests/*,*/migrations/*,*/__pycache__/*" \
-          -m odoo --test-enable \
-          -u karage_pos \
+          -m odoo \
+          --test-tags=/karage_pos \
           --database=odoo_test \
           --db-filter=odoo_test \
           --stop-after-init \
