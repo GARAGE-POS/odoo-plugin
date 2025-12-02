@@ -86,6 +86,9 @@ jobs:
         sed -i 's/"version": "18\.0/"version": "17.0/' karage_pos/__manifest__.py
         # Convert list to tree in XML views (Odoo 17 syntax)
         sed -i 's/<list /<tree /g; s/<\/list>/<\/tree>/g' karage_pos/views/webhook_log_views.xml
+        # Update version check in tests
+        sed -i 's/startswith("18\.0")/startswith("17.0")/g' karage_pos/tests/test_models.py
+        sed -i 's/start with 18\.0/start with 17.0/g' karage_pos/tests/test_models.py
 
     - name: Prepare Odoo configuration
       run: |
