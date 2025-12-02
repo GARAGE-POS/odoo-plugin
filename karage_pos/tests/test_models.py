@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import json
+import uuid
 from datetime import datetime, timedelta
 
 from odoo import fields
@@ -96,7 +97,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
     def test_create_log_with_idempotency_key(self):
         """Test creating log with idempotency key"""
         body = {"OrderID": 789}
-        idempotency_key = "test-key-123"
+        idempotency_key = f"test-key-{uuid.uuid4()}"
         log = self.WebhookLog.create_log(
             webhook_body=body, idempotency_key=idempotency_key
         )
@@ -128,7 +129,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
 
     def test_idempotency_key_unique_constraint(self):
         """Test idempotency key uniqueness constraint"""
-        idempotency_key = "unique-key-test"
+        idempotency_key = f"unique-key-{uuid.uuid4()}"
         self.WebhookLog.create_log(
             webhook_body={"OrderID": 1}, idempotency_key=idempotency_key
         )
@@ -141,7 +142,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
 
     def test_get_or_create_log_new_record(self):
         """Test get_or_create_log creates new record"""
-        idempotency_key = "new-record-key"
+        idempotency_key = f"new-record-{uuid.uuid4()}"
         record, created = self.WebhookLog.get_or_create_log(
             idempotency_key=idempotency_key,
             order_id="12345",
@@ -154,7 +155,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
 
     def test_get_or_create_log_existing_record(self):
         """Test get_or_create_log returns existing record"""
-        idempotency_key = "existing-record-key"
+        idempotency_key = f"existing-record-{uuid.uuid4()}"
         # Create first record
         first_record, created1 = self.WebhookLog.get_or_create_log(
             idempotency_key=idempotency_key,
@@ -173,7 +174,7 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
 
     def test_get_or_create_log_with_webhook_body(self):
         """Test get_or_create_log with webhook body"""
-        idempotency_key = "body-key-test"
+        idempotency_key = f"body-key-{uuid.uuid4()}"
         webhook_body = {"OrderID": 999, "AmountTotal": 500.0}
 
         record, created = self.WebhookLog.get_or_create_log(
@@ -497,6 +498,59 @@ class TestWebhookLog(TransactionCase, KaragePosTestCommon):
         self.assertEqual(log.http_method, "POST")
         self.assertFalse(log.success)
         self.assertIsNotNone(log.receive_date)
+
+    def test_get_or_create_log_lock_exception_with_existing_record(self):
+        """Test get_or_create_log handles lock exception when record exists"""
+        from unittest.mock import patch
+
+        idempotency_key = f"lock-exception-{uuid.uuid4()}"
+
+        # First create the record normally
+        first_record, created = self.WebhookLog.get_or_create_log(
+            idempotency_key=idempotency_key,
+            order_id="123",
+        )
+        self.assertTrue(created)
+
+        # Now mock cr.execute to raise an exception (simulating lock failure)
+        # Then the search should find the existing record
+        original_execute = self.env.cr.execute
+
+        def mock_execute(*args, **kwargs):
+            if args and "FOR UPDATE NOWAIT" in str(args[0]):
+                raise Exception("Lock not acquired")
+            return original_execute(*args, **kwargs)
+
+        with patch.object(self.env.cr, 'execute', side_effect=mock_execute):
+            record, created = self.WebhookLog.get_or_create_log(
+                idempotency_key=idempotency_key,
+                order_id="123",
+            )
+
+        self.assertFalse(created)
+        self.assertEqual(record.id, first_record.id)
+
+    def test_get_or_create_log_creates_with_order_id(self):
+        """Test get_or_create_log creates record with order_id"""
+        idempotency_key = f"order-id-test-{uuid.uuid4()}"
+
+        record, created = self.WebhookLog.get_or_create_log(
+            idempotency_key=idempotency_key,
+            order_id="test-order-123",
+            status="processing",
+        )
+
+        self.assertTrue(created)
+        self.assertEqual(record.order_id, "test-order-123")
+        self.assertEqual(record.status, "processing")
+
+    def test_get_or_create_log_no_body_no_key_raises(self):
+        """Test get_or_create_log raises when neither key nor body provided"""
+        with self.assertRaises(ValidationError):
+            self.WebhookLog.get_or_create_log(
+                idempotency_key=None,
+                webhook_body=None,
+            )
 
 
 @tagged("post_install", "-at_install")

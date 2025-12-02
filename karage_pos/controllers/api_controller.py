@@ -78,7 +78,6 @@ class APIController(http.Controller):
                 response_message=message,
                 success=success,
                 pos_order_id=pos_order,
-                idempotency_record_id=idempotency_record,
                 processing_time=time.time() - start_time if start_time else None,
             )
         except Exception as e:
@@ -140,6 +139,9 @@ class APIController(http.Controller):
                 .with_user(1)
                 ._check_credentials(scope="rpc", key=api_key)
             )
+            if not user_id:
+                _logger.warning("Invalid API key - no user found")
+                return False, "Invalid or missing API key"
             request.update_env(user=user_id)
             _logger.info(f"API request authenticated for user ID: {user_id}")
             return True, None
