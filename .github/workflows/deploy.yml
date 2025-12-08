@@ -59,15 +59,17 @@ jobs:
             chmod +x scripts/transform_odoo17.sh
             ./scripts/transform_odoo17.sh "$MODULE_DIR"
             rm -rf scripts/
+            git reset HEAD -- scripts/ 2>/dev/null || true
         elif [[ "$VERSION" == "19.0" ]]; then
             echo "Applying Odoo 19 transformations..."
             git checkout main -- scripts/transform_odoo19.sh
             chmod +x scripts/transform_odoo19.sh
             ./scripts/transform_odoo19.sh "$MODULE_DIR"
             rm -rf scripts/
+            git reset HEAD -- scripts/ 2>/dev/null || true
         fi
 
-        # Stage and commit
+        # Stage only the module folder
         echo "Committing changes..."
         git add "$MODULE_DIR/"
         git commit -m "Karage POS Integration module for Odoo $VERSION
