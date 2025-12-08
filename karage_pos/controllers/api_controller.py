@@ -990,11 +990,12 @@ class APIController(http.Controller):
             if price > 0 and discount_amount > 0:
                 discount_percent = (discount_amount / (price * quantity)) * 100.0
 
-            # Calculate base price after discount
+            # Calculate line total (webhook prices are assumed to be final/tax-inclusive)
             price_after_discount = price * (1 - discount_percent / 100.0)
-            subtotal_excl = price_after_discount * quantity
+            subtotal = price_after_discount * quantity
 
-            # Get taxes for the product
+            # Get taxes for the product (for display/reporting purposes only)
+            # The actual amounts come from the webhook, not from Odoo tax computation
             taxes = product.taxes_id.filtered(
                 lambda t: t.company_id.id == pos_session.config_id.company_id.id
             )
@@ -1003,27 +1004,14 @@ class APIController(http.Controller):
             if fiscal_position:
                 taxes = fiscal_position.map_tax(taxes)
 
-            # Compute tax-inclusive total using Odoo's tax computation
-            if taxes:
-                tax_computation = taxes.compute_all(
-                    subtotal_excl,
-                    pos_session.config_id.currency_id,
-                    1,  # quantity already included in subtotal_excl
-                    product=product,
-                    partner=False,
-                )
-                subtotal_incl = tax_computation['total_included']
-            else:
-                subtotal_incl = subtotal_excl
-
             order_lines.append((0, 0, {
                 "product_id": product.id,
                 "qty": quantity,
                 "price_unit": price,
                 "discount": discount_percent,
-                "price_subtotal": subtotal_excl,
-                "price_subtotal_incl": subtotal_incl,
-                "tax_ids": [(6, 0, taxes.ids)],
+                "price_subtotal": subtotal,
+                "price_subtotal_incl": subtotal,
+                "tax_ids": [(6, 0, [])],  # Don't assign taxes - webhook provides final amounts
             }))
 
         if not order_lines:
