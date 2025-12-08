@@ -696,7 +696,6 @@ class APIController(http.Controller):
                 "date_order": order_datetime,  # Use external timestamp
                 "partner_id": False,
                 "to_invoice": False,
-                "note": f'External Order ID: {data.get("OrderID")}',
                 "lines": order_lines,
                 "amount_total": final_total,
                 "amount_tax": final_tax,
