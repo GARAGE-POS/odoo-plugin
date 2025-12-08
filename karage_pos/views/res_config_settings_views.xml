@@ -7,39 +7,118 @@
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
                 <app string="Karage POS" name="karage_pos">
-                    <block title="API Authentication" name="karage_pos_api_info">
-                        <div class="alert alert-info">
-                            <h4>Webhook API Authentication</h4>
-                            <p>The webhook endpoint requires authentication using Odoo's built-in API key system.</p>
-
-                            <h5 class="mt-3">How to Create an API Key:</h5>
-                            <ol>
-                                <li><strong>Navigate:</strong> Click your User Icon (top right) → Preferences</li>
-                                <li><strong>Account Security:</strong> Go to the "Account Security" tab</li>
-                                <li><strong>Create Key:</strong> Click "New API Key" button</li>
-                                <li><strong>Name the Key:</strong> Enter a clear description (e.g., "Karage POS Webhook Integration")
-                                    <br/><small class="text-warning">⚠️ This description is the only way to identify the key later!</small>
-                                </li>
-                                <li><strong>Set Duration:</strong> Choose key validity:
-                                    <ul>
-                                        <li>Temporary: 1 Day, 1 Week, 1 Month, 3 Months, 6 Months, 1 Year</li>
-                                        <li><strong>Persistent Key</strong> (recommended for production - never expires)</li>
-                                        <li>Custom Date</li>
-                                    </ul>
-                                </li>
-                                <li><strong>Copy the Key:</strong> After creation, copy and securely store the API key
-                                    <br/><small class="text-danger">⚠️ You won't be able to see it again!</small>
-                                </li>
-                                <li><strong>Configure:</strong> Add the API key to your external Karage POS system</li>
-                            </ol>
-
-                            <h5 class="mt-3">Using the API Key:</h5>
-                            <p>Include the key in webhook requests using the <code>X-API-KEY</code> header:</p>
-                            <pre class="bg-light p-2 border">POST /api/v1/webhook/pos-order
-X-API-KEY: your_api_key_here
-Content-Type: application/json</pre>
-                        </div>
+                    <!-- POS Configuration -->
+                    <block title="POS Configuration" name="karage_pos_config">
+                        <setting string="External POS Configuration" name="external_pos_config_setting">
+                            <field name="external_pos_config_id"/>
+                            <div class="text-muted">
+                                Select the POS configuration to use for webhook orders.
+                                <strong>This is required for the webhook integration to work.</strong>
+                            </div>
+                        </setting>
+                        <setting string="Acceptable Session States" name="acceptable_session_states_setting">
+                            <field name="acceptable_session_states"/>
+                            <div class="text-muted">
+                                Comma-separated list of valid POS session states (e.g., "opened,opening_control").
+                            </div>
+                        </setting>
                     </block>
+
+                    <!-- Payment Configuration -->
+                    <block title="Payment Configuration" name="karage_pos_payment_config">
+                        <setting string="Default Payment Mode" name="fallback_payment_mode_setting">
+                            <field name="fallback_payment_mode"/>
+                            <div class="text-muted">
+                                Default external payment mode code when not provided in webhook.
+                            </div>
+                        </setting>
+                        <setting string="Default Payment Method" name="fallback_payment_method_setting">
+                            <field name="fallback_payment_method_id"/>
+                            <div class="text-muted">
+                                Fallback payment method when no mapping exists for the external payment code.
+                            </div>
+                        </setting>
+                        <setting string="Payment Mappings" name="payment_mappings_setting">
+                            <div class="mt-2">
+                                <button name="%(karage_pos.karage_pos_payment_mapping_action)d"
+                                        type="action"
+                                        string="Configure Payment Mappings"
+                                        class="btn-link"
+                                        icon="fa-credit-card"/>
+                            </div>
+                            <div class="text-muted">
+                                Map external payment codes to Odoo POS payment methods.
+                            </div>
+                        </setting>
+                    </block>
+
+                    <!-- Order Processing -->
+                    <block title="Order Processing" name="karage_pos_order_processing">
+                        <setting string="External Order Source Code" name="external_order_source_code_setting">
+                            <field name="external_order_source_code"/>
+                            <div class="text-muted">
+                                Identifier stored on orders received via webhook (for tracking).
+                            </div>
+                        </setting>
+                        <setting string="Consistency Check Multiplier" name="consistency_check_multiplier_setting">
+                            <field name="consistency_check_multiplier"/>
+                            <div class="text-muted">
+                                Multiplier for currency rounding tolerance in data consistency checks.
+                            </div>
+                        </setting>
+                        <setting string="Tax Calculation Priority" name="tax_calculation_priority_setting">
+                            <field name="tax_calculation_priority"/>
+                            <div class="text-muted">
+                                When both tax percent and tax amount are provided, which to use first.
+                            </div>
+                        </setting>
+                        <setting string="Valid Order Statuses" name="valid_order_statuses_setting">
+                            <field name="valid_order_statuses"/>
+                            <div class="text-muted">
+                                Comma-separated list of valid OrderStatus values (e.g., "103,104").
+                            </div>
+                        </setting>
+                    </block>
+
+                    <!-- Product Validation -->
+                    <block title="Product Validation" name="karage_pos_product_validation">
+                        <setting string="Require Sale OK" name="product_require_sale_ok_setting">
+                            <field name="product_require_sale_ok"/>
+                            <div class="text-muted">
+                                Only accept products where "Can be Sold" is enabled.
+                            </div>
+                        </setting>
+                        <setting string="Require Available in POS" name="product_require_available_in_pos_setting">
+                            <field name="product_require_available_in_pos"/>
+                            <div class="text-muted">
+                                Only accept products where "Available in POS" is enabled.
+                            </div>
+                        </setting>
+                        <setting string="Enforce Company Match" name="enforce_product_company_match_setting">
+                            <field name="enforce_product_company_match"/>
+                            <div class="text-muted">
+                                Require products to belong to the same company as the POS session.
+                            </div>
+                        </setting>
+                    </block>
+
+                    <!-- API & Logging -->
+                    <block title="API &amp; Logging" name="karage_pos_api_logging">
+                        <setting string="API Key Scopes" name="api_key_scopes_setting">
+                            <field name="api_key_scopes"/>
+                            <div class="text-muted">
+                                Comma-separated list of API key scopes to try for authentication.
+                            </div>
+                        </setting>
+                        <setting string="Log Key Truncation" name="log_key_truncation_length_setting">
+                            <field name="log_key_truncation_length"/>
+                            <div class="text-muted">
+                                Number of characters to show when logging idempotency keys (for privacy).
+                            </div>
+                        </setting>
+                    </block>
+
+                    <!-- Idempotency Configuration -->
                     <block title="Idempotency Configuration" name="karage_pos_idempotency_config">
                         <setting string="Processing Timeout" name="idempotency_timeout_setting">
                             <field name="idempotency_processing_timeout"/>
@@ -54,21 +133,50 @@ Content-Type: application/json</pre>
                             </div>
                         </setting>
                     </block>
+
+                    <!-- Bulk Sync Configuration -->
                     <block title="Bulk Sync Configuration" name="karage_pos_bulk_sync_config">
                         <setting string="Maximum Orders per Bulk Request" name="bulk_sync_max_orders_setting">
                             <field name="bulk_sync_max_orders"/>
                             <div class="text-muted">
-                                Maximum number of orders allowed in a single bulk sync request. Default: 1000 orders.
+                                Maximum number of orders allowed in a single bulk sync request.
                             </div>
                         </setting>
                     </block>
-                    <block title="Order Validation" name="karage_pos_order_validation">
-                        <setting string="Valid Order Statuses" name="valid_order_statuses_setting">
-                            <field name="valid_order_statuses"/>
-                            <div class="text-muted">
-                                Comma-separated list of valid OrderStatus values (e.g., "103,104"). Only orders with these status codes will be accepted.
-                            </div>
-                        </setting>
+
+                    <!-- API Authentication Info -->
+                    <block title="API Authentication Help" name="karage_pos_api_info">
+                        <div class="alert alert-info">
+                            <h4>Webhook API Authentication</h4>
+                            <p>The webhook endpoint requires authentication using Odoo's built-in API key system.</p>
+
+                            <h5 class="mt-3">How to Create an API Key:</h5>
+                            <ol>
+                                <li><strong>Navigate:</strong> Click your User Icon (top right) → Preferences</li>
+                                <li><strong>Account Security:</strong> Go to the "Account Security" tab</li>
+                                <li><strong>Create Key:</strong> Click "New API Key" button</li>
+                                <li><strong>Name the Key:</strong> Enter a clear description (e.g., "Karage POS Webhook Integration")
+                                    <br/><small class="text-warning">This description is the only way to identify the key later!</small>
+                                </li>
+                                <li><strong>Set Duration:</strong> Choose key validity:
+                                    <ul>
+                                        <li>Temporary: 1 Day, 1 Week, 1 Month, 3 Months, 6 Months, 1 Year</li>
+                                        <li><strong>Persistent Key</strong> (recommended for production - never expires)</li>
+                                        <li>Custom Date</li>
+                                    </ul>
+                                </li>
+                                <li><strong>Copy the Key:</strong> After creation, copy and securely store the API key
+                                    <br/><small class="text-danger">You won't be able to see it again!</small>
+                                </li>
+                                <li><strong>Configure:</strong> Add the API key to your external Karage POS system</li>
+                            </ol>
+
+                            <h5 class="mt-3">Using the API Key:</h5>
+                            <p>Include the key in webhook requests using the <code>X-API-KEY</code> header:</p>
+                            <pre class="bg-light p-2 border">POST /api/v1/webhook/pos-order
+X-API-KEY: your_api_key_here
+Content-Type: application/json</pre>
+                        </div>
                     </block>
                 </app>
             </xpath>

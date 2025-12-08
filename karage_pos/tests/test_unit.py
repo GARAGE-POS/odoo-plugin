@@ -510,12 +510,19 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
 
     def test_validate_product_for_pos_valid(self):
         """Test validating a valid POS product"""
-        error = self.controller._validate_product_for_pos(self.product1, self.pos_session)
+        # Pass config values directly to avoid request context requirement
+        error = self.controller._validate_product_for_pos(
+            self.product1, self.pos_session,
+            require_sale_ok=True, require_available_in_pos=True, enforce_company_match=True
+        )
         self.assertIsNone(error)
 
     def test_validate_product_for_pos_none(self):
         """Test validating None product"""
-        error = self.controller._validate_product_for_pos(None, self.pos_session)
+        error = self.controller._validate_product_for_pos(
+            None, self.pos_session,
+            require_sale_ok=True, require_available_in_pos=True, enforce_company_match=True
+        )
         self.assertIsNotNone(error)
         self.assertEqual(error["status"], 404)
 
@@ -528,7 +535,10 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
             "available_in_pos": True,
         })
 
-        error = self.controller._validate_product_for_pos(inactive_product, self.pos_session)
+        error = self.controller._validate_product_for_pos(
+            inactive_product, self.pos_session,
+            require_sale_ok=True, require_available_in_pos=True, enforce_company_match=True
+        )
         self.assertIsNotNone(error)
         self.assertEqual(error["status"], 400)
         self.assertIn("not active", error["message"])
@@ -541,7 +551,10 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
             "available_in_pos": True,
         })
 
-        error = self.controller._validate_product_for_pos(non_sale_product, self.pos_session)
+        error = self.controller._validate_product_for_pos(
+            non_sale_product, self.pos_session,
+            require_sale_ok=True, require_available_in_pos=True, enforce_company_match=True
+        )
         self.assertIsNotNone(error)
         self.assertEqual(error["status"], 400)
         self.assertIn("not available for sale", error["message"])
@@ -554,7 +567,10 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
             "available_in_pos": False,
         })
 
-        error = self.controller._validate_product_for_pos(not_pos_product, self.pos_session)
+        error = self.controller._validate_product_for_pos(
+            not_pos_product, self.pos_session,
+            require_sale_ok=True, require_available_in_pos=True, enforce_company_match=True
+        )
         self.assertIsNotNone(error)
         self.assertEqual(error["status"], 400)
         self.assertIn("not available in POS", error["message"])
@@ -569,7 +585,10 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
             "company_id": other_company.id,
         })
 
-        error = self.controller._validate_product_for_pos(other_company_product, self.pos_session)
+        error = self.controller._validate_product_for_pos(
+            other_company_product, self.pos_session,
+            require_sale_ok=True, require_available_in_pos=True, enforce_company_match=True
+        )
         self.assertIsNotNone(error)
         self.assertEqual(error["status"], 400)
         self.assertIn("different company", error["message"])
@@ -1277,6 +1296,11 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
 
         # Delete all POS configs to prevent auto-creation
         self.env["pos.config"].search([]).write({"active": False})
+
+        # Clear the external POS config parameter
+        self.env["ir.config_parameter"].sudo().set_param(
+            "karage_pos.external_pos_config_id", ""
+        )
 
         data = {
             "OrderID": 8006,
