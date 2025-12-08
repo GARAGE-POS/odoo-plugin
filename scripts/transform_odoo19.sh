@@ -6,6 +6,7 @@
 # 1. Version string: 18.0.x.x -> 19.0.x.x
 # 2. Test assertions: version checks updated
 # 3. Search view group: remove 'expand' and 'string' attributes (deprecated in Odoo 19)
+# 4. _sql_constraints: convert to models.Constraint (new in Odoo 19)
 
 set -e
 
@@ -52,5 +53,85 @@ for XML_FILE in "$MODULE_DIR/views/webhook_log_views.xml" "$MODULE_DIR/views/kar
         echo "  - Warning: $XML_FILE not found"
     fi
 done
+
+# Transform _sql_constraints to models.Constraint (Odoo 19 new API)
+# In Odoo 19, _sql_constraints is deprecated and replaced by models.Constraint
+#
+# Old syntax:
+#   _sql_constraints = [
+#       ('name', 'constraint_expression', 'message'),
+#   ]
+#
+# New syntax:
+#   _name = models.Constraint('constraint_expression', 'message')
+#
+# This is done via Python script for more complex transformation
+
+python3 - "$MODULE_DIR" << 'PYTHON_SCRIPT'
+import re
+import sys
+
+module_dir = sys.argv[1] if len(sys.argv) > 1 else 'karage_pos'
+
+model_files = [
+    f"{module_dir}/models/webhook_log.py",
+    f"{module_dir}/models/karage_pos_payment_mapping.py",
+]
+
+import os
+for model_file in model_files:
+    if not os.path.exists(model_file):
+        print(f"  - Warning: {model_file} not found")
+        continue
+
+    with open(model_file, 'r') as f:
+        content = f.read()
+
+    # Check if file has _sql_constraints
+    if '_sql_constraints' not in content:
+        print(f"  - No _sql_constraints in {model_file}")
+        continue
+
+    # Parse and transform _sql_constraints
+    # First, extract the _sql_constraints block
+    pattern = r'_sql_constraints\s*=\s*\[(.*?)\]'
+    match = re.search(pattern, content, re.DOTALL)
+
+    if not match:
+        print(f"  - Could not parse _sql_constraints in {model_file}")
+        continue
+
+    constraints_block = match.group(1)
+
+    # Parse individual constraints - handle multi-line tuples
+    # Looking for ('name', 'constraint', 'message') patterns
+    constraint_pattern = r'\(\s*["\']([^"\']+)["\']\s*,\s*["\']([^"\']+)["\']\s*,\s*["\']([^"\']+)["\']'
+    constraints = re.findall(constraint_pattern, constraints_block)
+
+    if not constraints:
+        print(f"  - Could not find constraints in {model_file}")
+        continue
+
+    # Build replacement: models.Constraint declarations
+    new_constraints = []
+    for name, constraint_expr, message in constraints:
+        # Convert constraint name to valid Python identifier with underscore prefix
+        attr_name = f"_{name}"
+        new_constraints.append(f'    {attr_name} = models.Constraint("{constraint_expr}", "{message}")')
+
+    new_constraints_str = '\n'.join(new_constraints)
+
+    # Replace the _sql_constraints block with new declarations
+    full_pattern = r'\n\s*_sql_constraints\s*=\s*\[.*?\]'
+    replacement = f'\n{new_constraints_str}'
+
+    new_content = re.sub(full_pattern, replacement, content, flags=re.DOTALL)
+
+    with open(model_file, 'w') as f:
+        f.write(new_content)
+
+    print(f"  - Converted _sql_constraints to models.Constraint in {model_file}")
+
+PYTHON_SCRIPT
 
 echo "Odoo 19 transformations complete."
