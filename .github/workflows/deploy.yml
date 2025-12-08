@@ -1,0 +1,103 @@
+name: Deploy to Version Branches
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Odoo version to deploy'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - '17.0'
+          - '18.0'
+          - '19.0'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        odoo_version: ${{ fromJson(github.event.inputs.version == 'all' && '["17.0", "18.0", "19.0"]' || format('["{0}"]', github.event.inputs.version)) }}
+      fail-fast: false
+
+    name: Deploy to ${{ matrix.odoo_version }}
+
+    steps:
+    - name: Checkout main branch
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        fetch-depth: 0
+
+    - name: Configure git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Deploy to ${{ matrix.odoo_version }}
+      env:
+        VERSION: ${{ matrix.odoo_version }}
+        MODULE_DIR: karage_pos
+      run: |
+        echo "=== Deploying $MODULE_DIR to branch $VERSION ==="
+
+        # Create orphan branch
+        echo "Creating orphan branch $VERSION-temp..."
+        git checkout --orphan "$VERSION-temp"
+        git rm -rf . > /dev/null 2>&1 || true
+
+        # Restore module from main
+        echo "Restoring $MODULE_DIR from main..."
+        git checkout main -- "$MODULE_DIR/"
+
+        # Apply version-specific transformations
+        if [[ "$VERSION" == "17.0" ]]; then
+            echo "Applying Odoo 17 transformations..."
+            git checkout main -- scripts/transform_odoo17.sh
+            chmod +x scripts/transform_odoo17.sh
+            ./scripts/transform_odoo17.sh "$MODULE_DIR"
+            rm -rf scripts/
+        elif [[ "$VERSION" == "19.0" ]]; then
+            echo "Applying Odoo 19 transformations..."
+            git checkout main -- scripts/transform_odoo19.sh
+            chmod +x scripts/transform_odoo19.sh
+            ./scripts/transform_odoo19.sh "$MODULE_DIR"
+            rm -rf scripts/
+        fi
+
+        # Stage and commit
+        echo "Committing changes..."
+        git add "$MODULE_DIR/"
+        git commit -m "Karage POS Integration module for Odoo $VERSION
+
+        Deployed from main branch commit: ${{ github.sha }}
+        Triggered by: ${{ github.actor }}"
+
+        # Replace existing branch
+        echo "Updating $VERSION branch..."
+        git branch -D "$VERSION" 2>/dev/null || true
+        git branch -m "$VERSION-temp" "$VERSION"
+
+        echo "=== Deployment prepared for $VERSION ==="
+
+    - name: Push to ${{ matrix.odoo_version }} branch
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: ${{ matrix.odoo_version }}
+        force: true
+
+    - name: Deployment summary
+      run: |
+        echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version:** ${{ matrix.odoo_version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Source commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Files deployed:" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        git ls-tree -r --name-only HEAD >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
