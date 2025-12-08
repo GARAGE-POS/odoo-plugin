@@ -128,10 +128,10 @@ class APIController(http.Controller):
         Authenticate using Odoo's built-in API key system
 
         :param api_key: API key to validate
-        :return: Tuple of (success: bool, error_message: str or None)
+        :return: Tuple of (success: bool, error_message: str or None, user_id: int or None)
         """
         if not api_key:
-            return False, "Invalid or missing API key"
+            return False, "Invalid or missing API key", None
 
         try:
             user_id = (
@@ -141,13 +141,13 @@ class APIController(http.Controller):
             )
             if not user_id:
                 _logger.warning("Invalid API key - no user found")
-                return False, "Invalid or missing API key"
+                return False, "Invalid or missing API key", None
             request.update_env(user=user_id)
             _logger.info(f"API request authenticated for user ID: {user_id}")
-            return True, None
+            return True, None, user_id
         except Exception as e:
             _logger.warning(f"Invalid API key attempt: {str(e)}")
-            return False, "Invalid or missing API key"
+            return False, "Invalid or missing API key", None
 
     def _check_idempotency(self, idempotency_key, order_id, webhook_log, start_time):
         """
@@ -301,12 +301,9 @@ class APIController(http.Controller):
             webhook_log = self._create_webhook_log(data, idempotency_key)
 
             # 5. Authenticate API key
-            authenticated, auth_error = self._authenticate_api_key(api_key)
+            authenticated, auth_error, authenticated_user_id = self._authenticate_api_key(api_key)
             if not authenticated:
                 return self._error_response(401, auth_error, webhook_log, start_time=start_time)
-
-            # Store authenticated user ID for session creation
-            authenticated_user_id = request.env.uid
 
             # 6. Check idempotency
             should_process, result = self._check_idempotency(
@@ -418,13 +415,10 @@ class APIController(http.Controller):
             webhook_log = self._create_webhook_log(data)
 
             # 5. Authenticate API key
-            authenticated, auth_error = self._authenticate_api_key(api_key)
+            authenticated, auth_error, authenticated_user_id = self._authenticate_api_key(api_key)
             if not authenticated:
                 self._update_log(webhook_log, 401, auth_error, False, start_time=start_time)
                 return self._json_response(None, status=401, error=auth_error)
-
-            # Store authenticated user ID for session creation
-            authenticated_user_id = request.env.uid
 
             # 6. Validate required fields
             if "orders" not in data:
@@ -818,6 +812,9 @@ class APIController(http.Controller):
             
             # Use provided user_id or fallback to system user
             session_user_id = user_id if user_id else 1
+            
+            if not user_id or user_id == 1:
+                _logger.warning("No authenticated user found for session creation, using admin user (ID: 1)")
             
             new_session = pos_session_env.create({
                 "config_id": pos_config.id,
