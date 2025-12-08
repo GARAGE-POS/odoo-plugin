@@ -305,6 +305,9 @@ class APIController(http.Controller):
             if not authenticated:
                 return self._error_response(401, auth_error, webhook_log, start_time=start_time)
 
+            # Store authenticated user ID for session creation
+            authenticated_user_id = request.env.uid
+
             # 6. Check idempotency
             should_process, result = self._check_idempotency(
                 idempotency_key, data.get("OrderID", ""), webhook_log, start_time
@@ -324,7 +327,7 @@ class APIController(http.Controller):
                 )
 
             # 8. Process the order
-            pos_order, order_error = self._process_pos_order(data)
+            pos_order, order_error = self._process_pos_order(data, authenticated_user_id)
             if order_error:
                 return self._error_response(
                     order_error.get("status", 500), order_error.get("message"),
@@ -420,6 +423,9 @@ class APIController(http.Controller):
                 self._update_log(webhook_log, 401, auth_error, False, start_time=start_time)
                 return self._json_response(None, status=401, error=auth_error)
 
+            # Store authenticated user ID for session creation
+            authenticated_user_id = request.env.uid
+
             # 6. Validate required fields
             if "orders" not in data:
                 error_msg = 'Missing required field: "orders"'
@@ -444,7 +450,7 @@ class APIController(http.Controller):
                 return self._json_response(None, status=400, error=error_msg)
 
             # 8. Process orders
-            results = self._process_bulk_orders(orders_data)
+            results = self._process_bulk_orders(orders_data, authenticated_user_id)
 
             # 9. Determine overall status
             total = len(results)
@@ -492,11 +498,12 @@ class APIController(http.Controller):
                 )
             return self._json_response(None, status=500, error=f"Internal server error: {str(e)}")
 
-    def _process_bulk_orders(self, orders_data):
+    def _process_bulk_orders(self, orders_data, user_id=None):
         """
         Process multiple orders independently
 
         :param orders_data: List of order data dicts
+        :param user_id: Authenticated user ID
         :return: List of result dicts, one per order
         """
         results = []
@@ -520,7 +527,7 @@ class APIController(http.Controller):
                         continue
 
                     # Process the order
-                    pos_order, order_error = self._process_pos_order(order_data)
+                    pos_order, order_error = self._process_pos_order(order_data, user_id)
 
                     if order_error:
                         results.append({
@@ -547,16 +554,17 @@ class APIController(http.Controller):
 
         return results
 
-    def _process_pos_order(self, data):
+    def _process_pos_order(self, data, user_id=None):
         """
         Process POS order from webhook data
 
         :param data: Validated webhook data
+        :param user_id: Authenticated user ID
         :return: Tuple of (pos_order, error_dict or None)
         """
         try:
             # Get or create POS session for external sync
-            pos_session = self._get_or_create_external_session()
+            pos_session = self._get_or_create_external_session(user_id)
 
             if not pos_session:
                 return None, {
@@ -743,7 +751,7 @@ class APIController(http.Controller):
 
         return calculated_total_with_tax, calculated_tax if tax_percent > 0 else tax
 
-    def _get_or_create_external_session(self):
+    def _get_or_create_external_session(self, user_id=None):
         """
         Get or create a POS session for external webhook integration
 
@@ -753,6 +761,7 @@ class APIController(http.Controller):
         3. Create a new session if needed
         4. Return the session
 
+        :param user_id: Authenticated user ID (required for session creation)
         :return: pos.session record or None
         """
         pos_session_env = request.env["pos.session"].sudo()
@@ -806,9 +815,13 @@ class APIController(http.Controller):
         # 5. Create a new session for external sync
         try:
             _logger.info(f"Creating new POS session for external sync using config: {pos_config.name}")
+            
+            # Use provided user_id or fallback to system user
+            session_user_id = user_id if user_id else 1
+            
             new_session = pos_session_env.create({
                 "config_id": pos_config.id,
-                "user_id": request.env.user.id,
+                "user_id": session_user_id,  # Use authenticated user ID
             })
 
             # Open the session
