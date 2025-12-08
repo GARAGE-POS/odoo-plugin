@@ -78,6 +78,7 @@ class APIController(http.Controller):
                 response_message=message,
                 success=success,
                 pos_order_id=pos_order,
+                idempotency_record_id=idempotency_record,
                 processing_time=time.time() - start_time if start_time else None,
             )
         except Exception as e:
@@ -133,21 +134,26 @@ class APIController(http.Controller):
         if not api_key:
             return False, "Invalid or missing API key"
 
-        try:
-            user_id = (
-                request.env["res.users.apikeys"]
-                .with_user(1)
-                ._check_credentials(scope="rpc", key=api_key)
-            )
-            if not user_id:
-                _logger.warning("Invalid API key - no user found")
-                return False, "Invalid or missing API key"
-            request.update_env(user=user_id)
-            _logger.info(f"API request authenticated for user ID: {user_id}")
-            return True, None
-        except Exception as e:
-            _logger.warning(f"Invalid API key attempt: {str(e)}")
-            return False, "Invalid or missing API key"
+        # Try different scopes that Odoo API keys might be created with
+        scopes_to_try = [
+            "rpc",
+            "odoo.addons.base.models.res_users",
+        ]
+
+        apikeys_model = request.env["res.users.apikeys"].with_user(1)
+
+        for scope in scopes_to_try:
+            try:
+                user_id = apikeys_model._check_credentials(scope=scope, key=api_key)
+                if user_id:
+                    request.update_env(user=user_id)
+                    _logger.info(f"API request authenticated for user ID: {user_id} (scope: {scope})")
+                    return True, None
+            except Exception:
+                continue
+
+        _logger.warning("API key check failed for all scopes")
+        return False, "Invalid or missing API key"
 
     def _check_idempotency(self, idempotency_key, order_id, webhook_log, start_time):
         """
@@ -610,12 +616,17 @@ class APIController(http.Controller):
                     }
 
             # Parse OrderDate from payload (use external timestamp)
-            from datetime import datetime
+            from datetime import datetime, timezone
             order_date = data.get("OrderDate")
             if order_date:
                 try:
                     # Handle ISO format with or without timezone
-                    order_datetime = datetime.fromisoformat(order_date.replace('Z', '+00:00'))
+                    parsed_dt = datetime.fromisoformat(order_date.replace('Z', '+00:00'))
+                    # Convert to UTC and remove timezone info (Odoo expects naive datetime in UTC)
+                    if parsed_dt.tzinfo is not None:
+                        order_datetime = parsed_dt.astimezone(timezone.utc).replace(tzinfo=None)
+                    else:
+                        order_datetime = parsed_dt
                 except (ValueError, AttributeError):
                     _logger.warning(f"Could not parse OrderDate: {order_date}. Using current time.")
                     order_datetime = fields.Datetime.now()
@@ -671,7 +682,7 @@ class APIController(http.Controller):
             )
             total_paid = sum(line[2]["amount"] for line in payment_lines)
 
-            # Create POS order (without payments first)
+            # Create POS order
             order_vals = {
                 "session_id": pos_session.id,
                 "config_id": pos_session.config_id.id,
@@ -686,33 +697,39 @@ class APIController(http.Controller):
                 "date_order": order_datetime,  # Use external timestamp
                 "partner_id": False,
                 "to_invoice": False,
+                "note": f'External Order ID: {data.get("OrderID")}',
                 "lines": order_lines,
                 "amount_total": final_total,
                 "amount_tax": final_tax,
-                "amount_paid": 0.0,
-                "amount_return": 0.0,
+                "amount_paid": total_paid,
+                "amount_return": max(0.0, total_paid - final_total),
                 # External order tracking fields
                 "external_order_id": external_order_id,
                 "external_order_source": "karage_pos_webhook",
                 "external_order_date": order_datetime,
             }
 
-            # Add general_note field if it exists (Odoo 18+ only)
-            pos_order_model = request.env["pos.order"]
-            if "general_note" in pos_order_model._fields:
-                order_vals["general_note"] = f'External Order ID: {data.get("OrderID")}'
-
             pos_order = request.env["pos.order"].sudo().create(order_vals)
 
-            # Create payments after order creation
-            for _, _, payment_vals in payment_lines:
+            # Create payments separately (required for Odoo 18)
+            for payment_line in payment_lines:
+                payment_vals = payment_line[2].copy()
                 payment_vals["pos_order_id"] = pos_order.id
+                payment_vals["session_id"] = pos_session.id
                 request.env["pos.payment"].sudo().create(payment_vals)
 
-            # Set order as paid directly instead of calling action_pos_order_paid
-            # This avoids the "not fully paid" check which can fail due to computed field timing
-            pos_order.write({"state": "paid"})
-            pos_session.write({"order_count": pos_session.order_count + 1})
+            # Invalidate cache and refresh to ensure amount_paid is recalculated
+            pos_order.invalidate_recordset(['amount_paid', 'payment_ids'])
+
+            # Log payment status for debugging
+            _logger.info(f"Order {pos_order.id}: amount_total={pos_order.amount_total}, amount_paid={pos_order.amount_paid}, payments={pos_order.payment_ids.mapped('amount')}")
+
+            # Confirm the order
+            try:
+                pos_order.action_pos_order_paid()
+            except Exception as e:
+                _logger.error(f"Error confirming POS order: {str(e)}", exc_info=True)
+                return None, {"status": 500, "message": f"Failed to confirm order: {str(e)}"}
 
             # Create picking for inventory
             try:
@@ -805,10 +822,12 @@ class APIController(http.Controller):
 
         # 5. Create a new session for external sync
         try:
+            # Use the current request user for the session
+            session_user_id = request.env.user.id
             _logger.info(f"Creating new POS session for external sync using config: {pos_config.name}")
             new_session = pos_session_env.create({
                 "config_id": pos_config.id,
-                "user_id": request.env.user.id,
+                "user_id": session_user_id,
             })
 
             # Open the session
@@ -973,7 +992,11 @@ class APIController(http.Controller):
             if price > 0 and discount_amount > 0:
                 discount_percent = (discount_amount / (price * quantity)) * 100.0
 
-            # Get taxes
+            # Price from external system already includes tax
+            price_incl = price * (1 - discount_percent / 100.0)
+            total_incl = price_incl * quantity
+
+            # Get taxes for the product
             taxes = product.taxes_id.filtered(
                 lambda t: t.company_id.id == pos_session.config_id.company_id.id
             )
@@ -982,22 +1005,29 @@ class APIController(http.Controller):
             if fiscal_position:
                 taxes = fiscal_position.map_tax(taxes)
 
-            # Calculate tax amount
-            tax_results = taxes.compute_all(
-                price * (1 - discount_percent / 100.0),
-                pos_session.config_id.currency_id,
-                quantity,
-                product=product,
-                partner=False,
-            )
+            # Compute tax backwards from tax-inclusive price
+            if taxes:
+                tax_results = taxes.compute_all(
+                    total_incl,
+                    pos_session.config_id.currency_id,
+                    1,  # quantity already included in total_incl
+                    product=product,
+                    partner=False,
+                )
+                # Since prices include tax, we need to extract the tax-excluded amount
+                # compute_all assumes price is exclusive, so we reverse calculate
+                tax_factor = sum(1 + (t.amount / 100.0) for t in taxes) / len(taxes) if taxes else 1
+                total_excl = total_incl / tax_factor if tax_factor else total_incl
+            else:
+                total_excl = total_incl
 
             order_lines.append((0, 0, {
                 "product_id": product.id,
                 "qty": quantity,
                 "price_unit": price,
                 "discount": discount_percent,
-                "price_subtotal": tax_results["total_excluded"],
-                "price_subtotal_incl": tax_results["total_included"],
+                "price_subtotal": total_excl,
+                "price_subtotal_incl": total_incl,
                 "tax_ids": [(6, 0, taxes.ids)],
             }))
 
@@ -1064,7 +1094,6 @@ class APIController(http.Controller):
                 "payment_method_id": payment_method.id,
                 "amount": amount,
                 "payment_date": fields.Datetime.now(),
-                "session_id": pos_session.id,
             }))
 
         if not payment_lines:

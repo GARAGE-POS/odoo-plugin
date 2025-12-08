@@ -169,31 +169,31 @@ The module provides a REST API endpoint for POS integration:
 Sample request payload:
 ```json
 {
-  "CreditCustomerID": 0,
-  "CustomerContact": "",
-  "AmountTotal": 25,
-  "LocationID": 404,
-  "CheckoutDate": "10-08-2025 05:16:43 PM",
-  "CustomerID": 0,
-  "OrderDetails": [
+  "OrderID": "11112111",
+  "OrderDate": "2025-08-10T17:16:43+00:00",
+  "OrderStatus": 103,
+  "AmountTotal": 18.75,
+  "AmountPaid": 18.75,
+  "GrandTotal": 18.75,
+  "Tax": 0,
+  "TaxPercent": 0,
+  "BalanceAmount": 0,
+  "OrderItems": [
     {
-      "ItemID": 180388,
-      "Name": "Fuchs Oil 5W30 Syn Sn",
-      "Price": 25,
+      "ItemID": 35722,
+      "ItemName": "465 LUBRICANTS 0W20 F.S",
+      "Price": 18.75,
       "Quantity": 1,
-      "Cost": 20
+      "DiscountAmount": 0
     }
   ],
-  "OrderCheckoutDetails": [
+  "CheckoutDetails": [
     {
       "PaymentMode": 1,
       "AmountPaid": 18.75,
       "CardType": "Cash"
     }
-  ],
-  "OrderStatus": 103,
-  "AmountPaid": 18.75,
-  "GrandTotal": 18.75
+  ]
 }
 ```
 
