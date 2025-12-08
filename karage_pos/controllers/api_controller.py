@@ -10,7 +10,7 @@ from odoo.http import request
 _logger = logging.getLogger(__name__)
 
 # Constants
-IR_CONFIG_PARAMETER = "IR_CONFIG_PARAMETER"
+IR_CONFIG_PARAMETER = "ir.config_parameter"
 
 
 class APIController(http.Controller):
@@ -1017,7 +1017,9 @@ class APIController(http.Controller):
         # Priority 3 & 4: ItemName (exact then fuzzy match)
         return self._find_product_by_name(product_env, item_name, company_id, config_param)
 
-    def _validate_product_for_pos(self, product, pos_session):
+    def _validate_product_for_pos(self, product, pos_session,
+                                  require_sale_ok=None, require_available_in_pos=None,
+                                  enforce_company_match=None):
         """
         Validate product is suitable for POS order
 
@@ -1029,6 +1031,9 @@ class APIController(http.Controller):
 
         :param product: Product to validate
         :param pos_session: POS session for company context
+        :param require_sale_ok: Override config setting (for testing)
+        :param require_available_in_pos: Override config setting (for testing)
+        :param enforce_company_match: Override config setting (for testing)
         :return: None if valid, error dict if invalid
         """
         if not product:
@@ -1037,17 +1042,21 @@ class APIController(http.Controller):
                 "message": "Product not found"
             }
 
-        # Get validation settings from config
-        config_param = request.env[IR_CONFIG_PARAMETER].sudo()
-        require_sale_ok = config_param.get_param(
-            "karage_pos.product_require_sale_ok", "True"
-        ).lower() == "true"
-        require_available_in_pos = config_param.get_param(
-            "karage_pos.product_require_available_in_pos", "True"
-        ).lower() == "true"
-        enforce_company_match = config_param.get_param(
-            "karage_pos.enforce_product_company_match", "True"
-        ).lower() == "true"
+        # Get validation settings from config if not provided
+        if require_sale_ok is None or require_available_in_pos is None or enforce_company_match is None:
+            config_param = request.env[IR_CONFIG_PARAMETER].sudo()
+            if require_sale_ok is None:
+                require_sale_ok = config_param.get_param(
+                    "karage_pos.product_require_sale_ok", "True"
+                ).lower() == "true"
+            if require_available_in_pos is None:
+                require_available_in_pos = config_param.get_param(
+                    "karage_pos.product_require_available_in_pos", "True"
+                ).lower() == "true"
+            if enforce_company_match is None:
+                enforce_company_match = config_param.get_param(
+                    "karage_pos.enforce_product_company_match", "True"
+                ).lower() == "true"
 
         if not product.active:
             return {

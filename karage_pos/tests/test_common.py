@@ -147,7 +147,11 @@ class KaragePosTestCommon:
             'karage_pos.external_pos_config_id', str(cls.pos_config.id)
         )
 
-        # Create payment mappings for tests
+        # Create payment mappings for tests (clean up any existing ones first)
+        cls.env['karage.pos.payment.mapping'].search([
+            ('external_code', 'in', [1, 2])
+        ]).unlink()
+
         cls.payment_mapping_cash = cls.env['karage.pos.payment.mapping'].create({
             'payment_type': '1',
             'name': 'Cash',

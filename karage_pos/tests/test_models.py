@@ -668,17 +668,17 @@ class TestResConfigSettings(TransactionCase, KaragePosTestCommon):
     def test_idempotency_processing_timeout_default(self):
         """Test default idempotency processing timeout"""
         settings = self.env["res.config.settings"].create({})
-        self.assertEqual(settings.idempotency_processing_timeout, 5)
+        self.assertEqual(settings.idempotency_processing_timeout, "5")
 
     def test_idempotency_retention_days_default(self):
         """Test default idempotency retention days"""
         settings = self.env["res.config.settings"].create({})
-        self.assertEqual(settings.idempotency_retention_days, 30)
+        self.assertEqual(settings.idempotency_retention_days, "30")
 
     def test_bulk_sync_max_orders_default(self):
         """Test default bulk sync max orders"""
         settings = self.env["res.config.settings"].create({})
-        self.assertEqual(settings.bulk_sync_max_orders, 1000)
+        self.assertEqual(settings.bulk_sync_max_orders, "1000")
 
     def test_valid_order_statuses_default(self):
         """Test default valid order statuses"""
@@ -688,9 +688,9 @@ class TestResConfigSettings(TransactionCase, KaragePosTestCommon):
     def test_config_parameter_persistence(self):
         """Test that config parameters are persisted"""
         settings = self.env["res.config.settings"].create({
-            "idempotency_processing_timeout": 10,
-            "idempotency_retention_days": 60,
-            "bulk_sync_max_orders": 500,
+            "idempotency_processing_timeout": "10",
+            "idempotency_retention_days": "60",
+            "bulk_sync_max_orders": "500",
             "valid_order_statuses": "103,104,105",
         })
         settings.execute()
@@ -723,5 +723,5 @@ class TestResConfigSettings(TransactionCase, KaragePosTestCommon):
 
         # Create settings and verify values are loaded
         settings = self.env["res.config.settings"].create({})
-        self.assertEqual(settings.idempotency_processing_timeout, 15)
-        self.assertEqual(settings.idempotency_retention_days, 45)
+        self.assertEqual(settings.idempotency_processing_timeout, "15")
+        self.assertEqual(settings.idempotency_retention_days, "45")
