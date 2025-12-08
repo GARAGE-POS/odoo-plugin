@@ -811,10 +811,11 @@ class APIController(http.Controller):
             _logger.info(f"Creating new POS session for external sync using config: {pos_config.name}")
             
             # Use provided user_id or fallback to system user
-            session_user_id = user_id if user_id else 1
-            
-            if not user_id or user_id == 1:
-                _logger.warning("No authenticated user found for session creation, using admin user (ID: 1)")
+            if not user_id:
+                _logger.warning("No authenticated user found for session creation, using admin user (ID: 1) as fallback")
+                session_user_id = 1
+            else:
+                session_user_id = user_id
             
             new_session = pos_session_env.create({
                 "config_id": pos_config.id,
