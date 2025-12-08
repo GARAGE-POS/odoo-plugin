@@ -11,8 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        odoo_version: ['18.0', '17.0']
+        odoo_version: ['19.0', '18.0', '17.0']
         include:
+          - odoo_version: '19.0'
+            python_version: '3.12'
+            postgres_version: '15'
           - odoo_version: '18.0'
             python_version: '3.11'
             postgres_version: '15'
@@ -78,6 +81,10 @@ jobs:
         git clone --depth 1 --branch ${{ matrix.odoo_version }} https://github.com/odoo/odoo.git /tmp/odoo
         pip install -r /tmp/odoo/requirements.txt
         pip install -e /tmp/odoo
+
+    - name: Transform module for Odoo 19
+      if: matrix.odoo_version == '19.0'
+      run: ./scripts/transform_odoo19.sh karage_pos
 
     - name: Transform module for Odoo 17
       if: matrix.odoo_version == '17.0'
