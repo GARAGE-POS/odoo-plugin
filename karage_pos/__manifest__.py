@@ -18,9 +18,9 @@
     ],
     "data": [
         "security/ir.model.access.csv",
+        "views/webhook_log_views.xml",
         "views/karage_pos_payment_mapping_views.xml",
         "views/res_config_settings_views.xml",
-        "views/webhook_log_views.xml",
     ],
     "images": ["static/description/banner.png"],
     "installable": True,
