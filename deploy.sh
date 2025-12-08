@@ -97,10 +97,10 @@ elif [[ "$VERSION" == "19.0" ]]; then
     rm -rf scripts/
 fi
 
-# Stage and commit
+# Stage and commit (bypass pre-commit since orphan branch has no config)
 echo "Committing changes..."
 git add "$MODULE_DIR/"
-git commit -m "Karage POS Integration module for Odoo $VERSION"
+PRE_COMMIT_ALLOW_NO_CONFIG=1 git commit -m "Karage POS Integration module for Odoo $VERSION"
 
 # Replace existing branch
 echo "Updating $VERSION branch..."
