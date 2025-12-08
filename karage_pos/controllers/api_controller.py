@@ -1017,17 +1017,46 @@ class APIController(http.Controller):
         # Priority 3 & 4: ItemName (exact then fuzzy match)
         return self._find_product_by_name(product_env, item_name, company_id, config_param)
 
+    def _get_product_validation_config(self):
+        """Get product validation settings from config parameters"""
+        config_param = request.env[IR_CONFIG_PARAMETER].sudo()
+        return {
+            "require_sale_ok": config_param.get_param(
+                "karage_pos.product_require_sale_ok", "True"
+            ).lower() == "true",
+            "require_available_in_pos": config_param.get_param(
+                "karage_pos.product_require_available_in_pos", "True"
+            ).lower() == "true",
+            "enforce_company_match": config_param.get_param(
+                "karage_pos.enforce_product_company_match", "True"
+            ).lower() == "true",
+        }
+
+    def _create_product_error(self, product, message_suffix):
+        """Create a standardized product validation error"""
+        return {
+            "status": 400,
+            "message": f"Product '{product.name}' (ID: {product.id}) {message_suffix}"
+        }
+
+    def _resolve_validation_settings(self, require_sale_ok, require_available_in_pos,
+                                     enforce_company_match):
+        """Resolve validation settings, loading from config if None"""
+        if None not in (require_sale_ok, require_available_in_pos, enforce_company_match):
+            return require_sale_ok, require_available_in_pos, enforce_company_match
+
+        config = self._get_product_validation_config()
+        return (
+            require_sale_ok if require_sale_ok is not None else config["require_sale_ok"],
+            require_available_in_pos if require_available_in_pos is not None else config["require_available_in_pos"],
+            enforce_company_match if enforce_company_match is not None else config["enforce_company_match"],
+        )
+
     def _validate_product_for_pos(self, product, pos_session,
                                   require_sale_ok=None, require_available_in_pos=None,
                                   enforce_company_match=None):
         """
         Validate product is suitable for POS order
-
-        Checks (based on configuration):
-        - Product exists and is active
-        - Product.sale_ok = True (if configured)
-        - Product.available_in_pos = True (if configured)
-        - Product company matches session company (if configured)
 
         :param product: Product to validate
         :param pos_session: POS session for company context
@@ -1037,53 +1066,25 @@ class APIController(http.Controller):
         :return: None if valid, error dict if invalid
         """
         if not product:
-            return {
-                "status": 404,
-                "message": "Product not found"
-            }
+            return {"status": 404, "message": "Product not found"}
 
-        # Get validation settings from config if not provided
-        if require_sale_ok is None or require_available_in_pos is None or enforce_company_match is None:
-            config_param = request.env[IR_CONFIG_PARAMETER].sudo()
-            if require_sale_ok is None:
-                require_sale_ok = config_param.get_param(
-                    "karage_pos.product_require_sale_ok", "True"
-                ).lower() == "true"
-            if require_available_in_pos is None:
-                require_available_in_pos = config_param.get_param(
-                    "karage_pos.product_require_available_in_pos", "True"
-                ).lower() == "true"
-            if enforce_company_match is None:
-                enforce_company_match = config_param.get_param(
-                    "karage_pos.enforce_product_company_match", "True"
-                ).lower() == "true"
+        require_sale_ok, require_available_in_pos, enforce_company_match = \
+            self._resolve_validation_settings(
+                require_sale_ok, require_available_in_pos, enforce_company_match
+            )
 
         if not product.active:
-            return {
-                "status": 400,
-                "message": f"Product '{product.name}' (ID: {product.id}) is not active"
-            }
+            return self._create_product_error(product, "is not active")
 
         if require_sale_ok and not product.sale_ok:
-            return {
-                "status": 400,
-                "message": f"Product '{product.name}' (ID: {product.id}) is not available for sale"
-            }
+            return self._create_product_error(product, "is not available for sale")
 
         if require_available_in_pos and not product.available_in_pos:
-            return {
-                "status": 400,
-                "message": f"Product '{product.name}' (ID: {product.id}) is not available in POS"
-            }
+            return self._create_product_error(product, "is not available in POS")
 
-        # Check company match
-        if enforce_company_match:
-            company_id = pos_session.config_id.company_id.id
-            if product.company_id and product.company_id.id != company_id:
-                return {
-                    "status": 400,
-                    "message": f"Product '{product.name}' (ID: {product.id}) belongs to a different company"
-                }
+        if enforce_company_match and product.company_id:
+            if product.company_id.id != pos_session.config_id.company_id.id:
+                return self._create_product_error(product, "belongs to a different company")
 
         return None
 
