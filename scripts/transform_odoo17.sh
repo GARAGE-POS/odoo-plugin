@@ -29,13 +29,14 @@ fi
 
 # Transform list -> tree in XML views (Odoo 17 syntax)
 # Handles both <list ...> and <list> patterns
-XML_FILE="$MODULE_DIR/views/webhook_log_views.xml"
-if [[ -f "$XML_FILE" ]]; then
-    sed -i -e 's/<list\([ >]\)/<tree\1/g' -e 's/<\/list>/<\/tree>/g' "$XML_FILE"
-    echo "  - Converted <list> to <tree> in $XML_FILE"
-else
-    echo "  - Warning: $XML_FILE not found"
-fi
+for XML_FILE in "$MODULE_DIR/views/webhook_log_views.xml" "$MODULE_DIR/views/karage_pos_payment_mapping_views.xml"; do
+    if [[ -f "$XML_FILE" ]]; then
+        sed -i -e 's/<list\([ >]\)/<tree\1/g' -e 's/<\/list>/<\/tree>/g' "$XML_FILE"
+        echo "  - Converted <list> to <tree> in $XML_FILE"
+    else
+        echo "  - Warning: $XML_FILE not found"
+    fi
+done
 
 # Transform test assertions for version checks
 TEST_FILE="$MODULE_DIR/tests/test_models.py"
