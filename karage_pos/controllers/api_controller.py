@@ -990,9 +990,9 @@ class APIController(http.Controller):
             if price > 0 and discount_amount > 0:
                 discount_percent = (discount_amount / (price * quantity)) * 100.0
 
-            # Price from external system already includes tax
-            price_incl = price * (1 - discount_percent / 100.0)
-            total_incl = price_incl * quantity
+            # Calculate base price after discount
+            price_after_discount = price * (1 - discount_percent / 100.0)
+            subtotal_excl = price_after_discount * quantity
 
             # Get taxes for the product
             taxes = product.taxes_id.filtered(
@@ -1003,29 +1003,26 @@ class APIController(http.Controller):
             if fiscal_position:
                 taxes = fiscal_position.map_tax(taxes)
 
-            # Compute tax backwards from tax-inclusive price
+            # Compute tax-inclusive total using Odoo's tax computation
             if taxes:
-                tax_results = taxes.compute_all(
-                    total_incl,
+                tax_computation = taxes.compute_all(
+                    subtotal_excl,
                     pos_session.config_id.currency_id,
-                    1,  # quantity already included in total_incl
+                    1,  # quantity already included in subtotal_excl
                     product=product,
                     partner=False,
                 )
-                # Since prices include tax, we need to extract the tax-excluded amount
-                # compute_all assumes price is exclusive, so we reverse calculate
-                tax_factor = sum(1 + (t.amount / 100.0) for t in taxes) / len(taxes) if taxes else 1
-                total_excl = total_incl / tax_factor if tax_factor else total_incl
+                subtotal_incl = tax_computation['total_included']
             else:
-                total_excl = total_incl
+                subtotal_incl = subtotal_excl
 
             order_lines.append((0, 0, {
                 "product_id": product.id,
                 "qty": quantity,
                 "price_unit": price,
                 "discount": discount_percent,
-                "price_subtotal": total_excl,
-                "price_subtotal_incl": total_incl,
+                "price_subtotal": subtotal_excl,
+                "price_subtotal_incl": subtotal_incl,
                 "tax_ids": [(6, 0, taxes.ids)],
             }))
 
