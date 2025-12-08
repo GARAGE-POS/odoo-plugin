@@ -20,8 +20,8 @@ if [[ -z "$VERSION" ]]; then
     exit 1
 fi
 
-if [[ "$VERSION" != "17.0" && "$VERSION" != "18.0" ]]; then
-    echo "Error: Version must be 17.0 or 18.0"
+if [[ "$VERSION" != "17.0" && "$VERSION" != "18.0" && "$VERSION" != "19.0" ]]; then
+    echo "Error: Version must be 17.0, 18.0, or 19.0"
     exit 1
 fi
 
@@ -53,6 +53,11 @@ if [[ "$DRY_RUN" == "--dry-run" ]]; then
         echo "3. Transform files for Odoo 17:"
         echo "   - __manifest__.py: version 18.0.x.x -> 17.0.x.x"
         echo "   - webhook_log_views.xml: <list> -> <tree>"
+    elif [[ "$VERSION" == "19.0" ]]; then
+        echo "3. Transform files for Odoo 19:"
+        echo "   - __manifest__.py: version 18.0.x.x -> 19.0.x.x"
+        echo "   - models: _sql_constraints -> models.Constraint"
+        echo "   - views: remove deprecated group attributes"
     fi
 
     echo "4. Commit and force-push to $VERSION branch"
@@ -82,6 +87,12 @@ if [[ "$VERSION" == "17.0" ]]; then
     # Use centralized transform script (restore it first since orphan branch is empty)
     git checkout "$SOURCE_BRANCH" -- scripts/transform_odoo17.sh
     ./scripts/transform_odoo17.sh "$MODULE_DIR"
+    # Remove scripts dir - not needed for deployment
+    rm -rf scripts/
+elif [[ "$VERSION" == "19.0" ]]; then
+    # Use centralized transform script (restore it first since orphan branch is empty)
+    git checkout "$SOURCE_BRANCH" -- scripts/transform_odoo19.sh
+    ./scripts/transform_odoo19.sh "$MODULE_DIR"
     # Remove scripts dir - not needed for deployment
     rm -rf scripts/
 fi
