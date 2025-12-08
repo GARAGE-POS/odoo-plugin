@@ -389,12 +389,24 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["OrderItems"][0]["ItemName"] = self.product1.name
 
         response = self._make_webhook_request(data)
+        # Should create a new session automatically if POS config is set
+        self.assertEqual(response.status_code, 200)
+
+        # Test when no POS config is set
+        self.env["ir.config_parameter"].sudo().set_param(
+            "karage_pos.external_pos_config_id", "0"
+        )
+        data["OrderID"] = 99998  # New order ID
+        response = self._make_webhook_request(data)
         self.assertEqual(response.status_code, 400)
         result = json.loads(response.content)
         self.assertEqual(result["status"], "error")
-        self.assertIn("No open POS session", result["error"])
+        self.assertIn("POS configuration", result["error"])
 
-        # Reopen session for other tests
+        # Reset the config and reopen session for other tests
+        self.env["ir.config_parameter"].sudo().set_param(
+            "karage_pos.external_pos_config_id", str(self.pos_config.id)
+        )
         new_session = self.env["pos.session"].create(
             {
                 "config_id": self.pos_config.id,
@@ -873,7 +885,11 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         # Verify external tracking fields
         pos_order = self.env["pos.order"].browse(result["data"]["id"])
         self.assertEqual(pos_order.external_order_id, "9046")
-        self.assertEqual(pos_order.external_order_source, "karage_pos_webhook")
+        # external_order_source should match the configured value (default: karage_pos_webhook)
+        external_source = self.env["ir.config_parameter"].sudo().get_param(
+            "karage_pos.external_order_source_code", "karage_pos_webhook"
+        )
+        self.assertEqual(pos_order.external_order_source, external_source)
         self.assertIsNotNone(pos_order.external_order_date)
 
     def test_webhook_product_lookup_by_item_id(self):

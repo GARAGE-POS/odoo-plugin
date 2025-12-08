@@ -133,11 +133,13 @@ class APIController(http.Controller):
         if not api_key:
             return False, "Invalid or missing API key"
 
-        # Try different scopes that Odoo API keys might be created with
-        scopes_to_try = [
-            "rpc",
-            "odoo.addons.base.models.res_users",
-        ]
+        # Get scopes from configuration
+        config_param = request.env["ir.config_parameter"].sudo()
+        scopes_str = config_param.get_param(
+            "karage_pos.api_key_scopes",
+            "rpc,odoo.addons.base.models.res_users"
+        )
+        scopes_to_try = [s.strip() for s in scopes_str.split(",") if s.strip()]
 
         apikeys_model = request.env["res.users.apikeys"].with_user(1)
 
@@ -180,16 +182,20 @@ class APIController(http.Controller):
             )
         )
 
+        # Get log truncation length from config
+        config_param = request.env["ir.config_parameter"].sudo()
+        log_truncate_len = int(config_param.get_param("karage_pos.log_key_truncation_length", "20"))
+
         if created:
             # New request - proceed with processing
-            _logger.info(f"New request with idempotency key: {idempotency_key[:20]}...")
+            _logger.info(f"New request with idempotency key: {idempotency_key[:log_truncate_len]}...")
             return True, idempotency_record
 
         # Record already exists - check status
         if idempotency_record.status == "completed":
             # Return cached response
             _logger.info(
-                f"Duplicate request detected: {idempotency_key[:20]}... "
+                f"Duplicate request detected: {idempotency_key[:log_truncate_len]}... "
                 f"Returning cached response for OrderID: {idempotency_record.order_id}"
             )
             self._update_log(
@@ -227,14 +233,14 @@ class APIController(http.Controller):
 
                 if datetime.now() - idempotency_record.create_date > processing_timeout:
                     _logger.warning(
-                        f"Idempotency record stuck in processing state: {idempotency_key[:20]}... "
+                        f"Idempotency record stuck in processing state: {idempotency_key[:log_truncate_len]}... "
                         f"Allowing retry."
                     )
                     idempotency_record.write({"status": "processing"})
                     return True, idempotency_record
 
             # Still processing
-            _logger.warning(f"Request already being processed: {idempotency_key[:20]}...")
+            _logger.warning(f"Request already being processed: {idempotency_key[:log_truncate_len]}...")
             self._update_log(
                 webhook_log, 409, "Request is already being processed. Please wait.",
                 False, idempotency_record=idempotency_record, start_time=start_time
@@ -245,7 +251,7 @@ class APIController(http.Controller):
 
         elif idempotency_record.status == "failed":
             # Allow retry
-            _logger.info(f"Retrying previously failed request: {idempotency_key[:20]}...")
+            _logger.info(f"Retrying previously failed request: {idempotency_key[:log_truncate_len]}...")
             idempotency_record.mark_processing()
             return True, idempotency_record
 
@@ -586,12 +592,18 @@ class APIController(http.Controller):
                     "message": f'Journal not found for payment method(s): {", ".join(missing_journals)}'
                 }
 
+            # Get configuration parameters
+            config_param = request.env["ir.config_parameter"].sudo()
+            external_order_source = config_param.get_param(
+                "karage_pos.external_order_source_code", "karage_pos_webhook"
+            )
+
             # Check for duplicate external order ID
             external_order_id = str(data.get("OrderID", ""))
             if external_order_id:
                 existing = request.env["pos.order"].sudo().search([
                     ("external_order_id", "=", external_order_id),
-                    ("external_order_source", "=", "karage_pos_webhook"),
+                    ("external_order_source", "=", external_order_source),
                 ], limit=1)
                 if existing:
                     return None, {
@@ -643,17 +655,22 @@ class APIController(http.Controller):
             currency = pos_session.config_id.currency_id
             rounding = currency.rounding
 
+            # Get consistency check multiplier from config
+            consistency_multiplier = float(config_param.get_param(
+                "karage_pos.consistency_check_multiplier", "10.0"
+            ))
+
             calculated_total, calculated_tax = self._calculate_totals(
-                data.get("OrderItems", []), tax_percent, tax
+                data.get("OrderItems", []), tax_percent, tax, config_param
             )
 
-            if abs(calculated_total - grand_total) > rounding * 10:
+            if abs(calculated_total - grand_total) > rounding * consistency_multiplier:
                 return None, {
                     "status": 400,
                     "message": f"Data inconsistency: Calculated total ({calculated_total}) does not match GrandTotal ({grand_total})"
                 }
 
-            if abs(amount_paid - grand_total) > rounding * 10 and balance_amount > rounding:
+            if abs(amount_paid - grand_total) > rounding * consistency_multiplier and balance_amount > rounding:
                 return None, {
                     "status": 400,
                     "message": f"Data inconsistency: AmountPaid ({amount_paid}) + BalanceAmount ({balance_amount}) should equal GrandTotal ({grand_total})"
@@ -703,7 +720,7 @@ class APIController(http.Controller):
                 "amount_return": max(0.0, total_paid - final_total),
                 # External order tracking fields
                 "external_order_id": external_order_id,
-                "external_order_source": "karage_pos_webhook",
+                "external_order_source": external_order_source,
                 "external_order_date": order_datetime,
             }
 
@@ -741,7 +758,7 @@ class APIController(http.Controller):
             _logger.error(f"Error processing POS order: {str(e)}", exc_info=True)
             return None, {"status": 500, "message": str(e)}
 
-    def _calculate_totals(self, order_items, tax_percent, tax):
+    def _calculate_totals(self, order_items, tax_percent, tax, config_param=None):
         """Calculate expected totals from order items"""
         calculated_total = 0.0
         for item in order_items:
@@ -750,21 +767,37 @@ class APIController(http.Controller):
             item_discount = float(item.get("DiscountAmount", 0))
             calculated_total += (item_price * item_qty) - item_discount
 
-        if tax_percent > 0:
-            calculated_tax = calculated_total * (tax_percent / 100.0)
-            calculated_total_with_tax = calculated_total + calculated_tax
-        else:
-            calculated_total_with_tax = calculated_total + tax
+        # Get tax calculation priority from config
+        tax_priority = "percent_first"
+        if config_param:
+            tax_priority = config_param.get_param(
+                "karage_pos.tax_calculation_priority", "percent_first"
+            )
 
-        return calculated_total_with_tax, calculated_tax if tax_percent > 0 else tax
+        if tax_priority == "percent_first":
+            if tax_percent > 0:
+                calculated_tax = calculated_total * (tax_percent / 100.0)
+                calculated_total_with_tax = calculated_total + calculated_tax
+            else:
+                calculated_total_with_tax = calculated_total + tax
+                calculated_tax = tax
+        else:  # amount_first
+            if tax > 0:
+                calculated_total_with_tax = calculated_total + tax
+                calculated_tax = tax
+            else:
+                calculated_tax = calculated_total * (tax_percent / 100.0)
+                calculated_total_with_tax = calculated_total + calculated_tax
+
+        return calculated_total_with_tax, calculated_tax
 
     def _get_or_create_external_session(self):
         """
         Get or create a POS session for external webhook integration
 
         Strategy:
-        1. Look for an open session for a POS config with 'External' or 'Webhook' in the name
-        2. If no open session found, look for the newest POS config for external sync
+        1. Get the configured POS config from settings
+        2. Look for an open session for that config
         3. Create a new session if needed
         4. Return the session
 
@@ -772,53 +805,45 @@ class APIController(http.Controller):
         """
         pos_session_env = request.env["pos.session"].sudo()
         pos_config_env = request.env["pos.config"].sudo()
+        config_param = request.env["ir.config_parameter"].sudo()
 
-        # 1. Try to find an open session for external sync
-        # Look for POS config with 'External', 'Webhook', 'API', or 'Integration' in the name
-        # Check for both 'opened' and 'opening_control' states
-        pos_session = pos_session_env.search([
-            ("state", "in", ["opened", "opening_control"]),
-            "|", "|", "|",
-            ("config_id.name", "ilike", "external"),
-            ("config_id.name", "ilike", "webhook"),
-            ("config_id.name", "ilike", "api"),
-            ("config_id.name", "ilike", "integration"),
-        ], limit=1, order="id desc")
+        # Get configured POS config ID
+        pos_config_id = config_param.get_param("karage_pos.external_pos_config_id", "0")
+        try:
+            pos_config_id = int(pos_config_id)
+        except (ValueError, TypeError):
+            pos_config_id = 0
 
-        if pos_session:
-            _logger.info(f"Using existing external POS session: {pos_session.name}")
-            return pos_session
-
-        # 2. If no open session, find the POS config for external sync
-        pos_config = pos_config_env.search([
-            "|", "|", "|",
-            ("name", "ilike", "external"),
-            ("name", "ilike", "webhook"),
-            ("name", "ilike", "api"),
-            ("name", "ilike", "integration"),
-        ], limit=1, order="id desc")
-
-        # 3. If no dedicated external config, try to use any available POS config
-        if not pos_config:
-            _logger.warning("No dedicated external POS config found. Looking for any POS config...")
-            pos_config = pos_config_env.search([], limit=1, order="id desc")
-
-        if not pos_config:
-            _logger.error("No POS configuration found in the system")
+        if not pos_config_id:
+            _logger.error(
+                "No POS configuration set in Karage POS settings. "
+                "Please configure 'External POS Configuration' in Settings > Karage POS"
+            )
             return None
 
-        # 4. Check if there's already an open session for this config
-        # Check for both 'opened' and 'opening_control' states
+        # Get configured acceptable session states
+        states_str = config_param.get_param(
+            "karage_pos.acceptable_session_states", "opened,opening_control"
+        )
+        acceptable_states = [s.strip() for s in states_str.split(",") if s.strip()]
+
+        # Get the POS config
+        pos_config = pos_config_env.browse(pos_config_id)
+        if not pos_config.exists():
+            _logger.error(f"Configured POS config ID {pos_config_id} does not exist")
+            return None
+
+        # 1. Check if there's already an open session for this config
         existing_session = pos_session_env.search([
             ("config_id", "=", pos_config.id),
-            ("state", "in", ["opened", "opening_control"]),
+            ("state", "in", acceptable_states),
         ], limit=1)
 
         if existing_session:
             _logger.info(f"Found existing open session for config {pos_config.name}: {existing_session.name}")
             return existing_session
 
-        # 5. Create a new session for external sync
+        # 2. Create a new session for external sync
         try:
             # Use the current request user for the session
             session_user_id = request.env.user.id
@@ -854,7 +879,16 @@ class APIController(http.Controller):
         :return: Tuple of (product, lookup_method) or (None, None)
         """
         product_env = request.env["product.product"].sudo()
+        config_param = request.env["ir.config_parameter"].sudo()
         company_id = pos_session.config_id.company_id.id
+
+        # Get product validation settings
+        require_sale_ok = config_param.get_param(
+            "karage_pos.product_require_sale_ok", "True"
+        ).lower() == "true"
+        require_available_in_pos = config_param.get_param(
+            "karage_pos.product_require_available_in_pos", "True"
+        ).lower() == "true"
 
         # Priority 1: OdooItemID (direct product_id)
         if odoo_item_id and odoo_item_id > 0:
@@ -872,16 +906,17 @@ class APIController(http.Controller):
                 _logger.info(f"Product found by ItemID (legacy): {item_id}")
                 return product, "ItemID"
 
+        # Build search domain based on config
+        search_domain = [("name", "=", item_name)]
+        if require_sale_ok:
+            search_domain.append(("sale_ok", "=", True))
+        if require_available_in_pos:
+            search_domain.append(("available_in_pos", "=", True))
+        search_domain.extend(["|", ("company_id", "=", False), ("company_id", "=", company_id)])
+
         # Priority 3: ItemName exact match
         if item_name:
-            product = product_env.search([
-                ("name", "=", item_name),
-                ("sale_ok", "=", True),
-                ("available_in_pos", "=", True),
-                "|",
-                ("company_id", "=", False),
-                ("company_id", "=", company_id),
-            ], limit=1)
+            product = product_env.search(search_domain, limit=1)
 
             if product:
                 _logger.warning(
@@ -891,14 +926,14 @@ class APIController(http.Controller):
                 return product, "ItemName (exact)"
 
             # Priority 4: ItemName fuzzy match
-            product = product_env.search([
-                ("name", "ilike", item_name),
-                ("sale_ok", "=", True),
-                ("available_in_pos", "=", True),
-                "|",
-                ("company_id", "=", False),
-                ("company_id", "=", company_id),
-            ], limit=1)
+            fuzzy_domain = [("name", "ilike", item_name)]
+            if require_sale_ok:
+                fuzzy_domain.append(("sale_ok", "=", True))
+            if require_available_in_pos:
+                fuzzy_domain.append(("available_in_pos", "=", True))
+            fuzzy_domain.extend(["|", ("company_id", "=", False), ("company_id", "=", company_id)])
+
+            product = product_env.search(fuzzy_domain, limit=1)
 
             if product:
                 _logger.warning(
@@ -913,11 +948,11 @@ class APIController(http.Controller):
         """
         Validate product is suitable for POS order
 
-        Checks:
+        Checks (based on configuration):
         - Product exists and is active
-        - Product.sale_ok = True
-        - Product.available_in_pos = True
-        - Product company matches session company
+        - Product.sale_ok = True (if configured)
+        - Product.available_in_pos = True (if configured)
+        - Product company matches session company (if configured)
 
         :param product: Product to validate
         :param pos_session: POS session for company context
@@ -929,31 +964,44 @@ class APIController(http.Controller):
                 "message": "Product not found"
             }
 
+        # Get validation settings from config
+        config_param = request.env["ir.config_parameter"].sudo()
+        require_sale_ok = config_param.get_param(
+            "karage_pos.product_require_sale_ok", "True"
+        ).lower() == "true"
+        require_available_in_pos = config_param.get_param(
+            "karage_pos.product_require_available_in_pos", "True"
+        ).lower() == "true"
+        enforce_company_match = config_param.get_param(
+            "karage_pos.enforce_product_company_match", "True"
+        ).lower() == "true"
+
         if not product.active:
             return {
                 "status": 400,
                 "message": f"Product '{product.name}' (ID: {product.id}) is not active"
             }
 
-        if not product.sale_ok:
+        if require_sale_ok and not product.sale_ok:
             return {
                 "status": 400,
                 "message": f"Product '{product.name}' (ID: {product.id}) is not available for sale"
             }
 
-        if not product.available_in_pos:
+        if require_available_in_pos and not product.available_in_pos:
             return {
                 "status": 400,
                 "message": f"Product '{product.name}' (ID: {product.id}) is not available in POS"
             }
 
         # Check company match
-        company_id = pos_session.config_id.company_id.id
-        if product.company_id and product.company_id.id != company_id:
-            return {
-                "status": 400,
-                "message": f"Product '{product.name}' (ID: {product.id}) belongs to a different company"
-            }
+        if enforce_company_match:
+            company_id = pos_session.config_id.company_id.id
+            if product.company_id and product.company_id.id != company_id:
+                return {
+                    "status": 400,
+                    "message": f"Product '{product.name}' (ID: {product.id}) belongs to a different company"
+                }
 
         return None
 
@@ -1024,46 +1072,74 @@ class APIController(http.Controller):
         payment_lines = []
         total_paid = 0.0
 
-        # Payment mode mapping
-        payment_mode_mapping = {
-            1: "Cash",
-            2: "Card",
-            3: "Credit",
-            5: "Tabby",
-            6: "Tamara",
-            7: "StcPay",
-            8: "Bank Transfer",
-        }
+        # Get configuration
+        config_param = request.env["ir.config_parameter"].sudo()
+        fallback_payment_mode = int(config_param.get_param(
+            "karage_pos.fallback_payment_mode", "1"
+        ))
+
+        # Get fallback payment method from config
+        fallback_payment_method_id = config_param.get_param(
+            "karage_pos.fallback_payment_method_id", "0"
+        )
+        try:
+            fallback_payment_method_id = int(fallback_payment_method_id)
+        except (ValueError, TypeError):
+            fallback_payment_method_id = 0
+
+        # Get payment mapping model
+        payment_mapping_env = request.env["karage.pos.payment.mapping"].sudo()
 
         for checkout in checkout_details:
-            payment_mode = checkout.get("PaymentMode", 1)
+            payment_mode = checkout.get("PaymentMode", fallback_payment_mode)
             amount = float(str(checkout.get("AmountPaid", 0)).replace(",", ""))
             card_type = checkout.get("CardType", "Cash")
 
             if amount <= 0:
                 continue
 
-            # Find payment method
+            # Find payment method using database mapping
             payment_method = None
-            journal_search_name = payment_mode_mapping.get(payment_mode)
 
-            if journal_search_name:
-                payment_method = pos_session.payment_method_ids.filtered(
-                    lambda p: p.journal_id and journal_search_name.lower() in p.journal_id.name.lower()
-                )[:1]
+            # Look up in payment mapping table
+            mapping = payment_mapping_env.search([
+                ("external_code", "=", payment_mode),
+                ("active", "=", True)
+            ], limit=1)
 
+            if mapping and mapping.payment_method_id:
+                # Check if the mapped payment method is available in this POS session
+                if mapping.payment_method_id in pos_session.payment_method_ids:
+                    payment_method = mapping.payment_method_id
+                else:
+                    _logger.warning(
+                        f"Payment method '{mapping.payment_method_id.name}' from mapping "
+                        f"is not available in POS session. Trying fallbacks."
+                    )
+
+            # Fallback: Try to find by CardType in journal name
             if not payment_method and card_type:
                 payment_method = pos_session.payment_method_ids.filtered(
                     lambda p: p.journal_id and card_type.lower() in p.journal_id.name.lower()
                 )[:1]
 
+            # Fallback: Use fallback payment method from config
+            if not payment_method and fallback_payment_method_id:
+                default_pm = request.env["pos.payment.method"].sudo().browse(fallback_payment_method_id)
+                if default_pm.exists() and default_pm in pos_session.payment_method_ids:
+                    payment_method = default_pm
+
+            # Fallback: Use cash payment method for payment mode 1
             if not payment_method and payment_mode == 1:
                 payment_method = pos_session.payment_method_ids.filtered(lambda p: p.is_cash_count)[:1]
 
             if not payment_method:
                 return None, {
                     "status": 400,
-                    "message": f'No payment method found for PaymentMode={payment_mode}, CardType={card_type}'
+                    "message": (
+                        f'No payment method found for PaymentMode={payment_mode}, CardType={card_type}. '
+                        f'Please configure payment mappings in Settings > Karage POS.'
+                    )
                 }
 
             if not payment_method.journal_id:

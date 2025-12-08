@@ -1,6 +1,10 @@
 #!/bin/bash
 echo "Starting Odoo with debugpy on port 5678..."
 echo "You can attach your debugger to localhost:5678 after Odoo starts"
+
+# Add venv site-packages to PYTHONPATH so system Python can find debugpy
+export PYTHONPATH="/mnt/extra-addons/.venv/lib/python3.12/site-packages:$PYTHONPATH"
+
 /usr/bin/python3 /mnt/extra-addons/.devcontainer/wait-for-psql.py --db_host db --db_port 5432 --db_user odoo --db_password odoo --timeout=30
 
 # Kill any process listening on port 5678 to avoid orphaned debugpy processes

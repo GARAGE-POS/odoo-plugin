@@ -138,9 +138,26 @@ class KaragePosTestCommon:
         )
         cls.pos_session.action_pos_session_open()
 
-        # Set Karage POS API key in system parameters
+        # Set Karage POS configuration parameters
         cls.env['ir.config_parameter'].sudo().set_param('karage_pos.api_key', 'test_api_key_12345')
         cls.api_key = 'test_api_key_12345'
+
+        # Configure the POS config for external webhook integration
+        cls.env['ir.config_parameter'].sudo().set_param(
+            'karage_pos.external_pos_config_id', str(cls.pos_config.id)
+        )
+
+        # Create payment mappings for tests
+        cls.payment_mapping_cash = cls.env['karage.pos.payment.mapping'].create({
+            'payment_type': '1',
+            'name': 'Cash',
+            'payment_method_id': cls.payment_method_cash.id,
+        })
+        cls.payment_mapping_card = cls.env['karage.pos.payment.mapping'].create({
+            'payment_type': '2',
+            'name': 'Card',
+            'payment_method_id': cls.payment_method_card.id,
+        })
 
         # Sample webhook data
         cls.sample_webhook_data = {
