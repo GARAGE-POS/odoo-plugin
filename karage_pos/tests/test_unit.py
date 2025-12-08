@@ -1314,31 +1314,24 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
         self.env["pos.config"].search([("active", "=", False)]).write({"active": True})
 
     def test_process_pos_order_with_tax(self):
-        """Test order with tax"""
-        # Create tax
-        country = self.env.ref("base.us", raise_if_not_found=False) or self.env["res.country"].search([], limit=1)
-        tax = self.env["account.tax"].create({
-            "name": "Test Tax 15%",
-            "amount": 15.0,
-            "type_tax_use": "sale",
-            "company_id": self.company.id,
-            "tax_group_id": self.tax_group.id,
-            "country_id": country.id,
-        })
-        self.product1.write({"taxes_id": [(6, 0, [tax.id])]})
+        """Test order with tax - webhook prices are tax-inclusive"""
+        # Note: Webhook sends final (tax-inclusive) prices
+        # Price in OrderItems is the tax-inclusive unit price
+        # Tax/TaxPercent should be 0 when prices already include tax
+        # (to avoid double-counting in validation)
 
         data = {
             "OrderID": 8007,
             "OrderStatus": 103,
             "AmountPaid": "115.0",
-            "AmountTotal": 100.0,
+            "AmountTotal": 115.0,
             "GrandTotal": 115.0,
-            "Tax": 15.0,
-            "TaxPercent": 15.0,
+            "Tax": 0.0,  # 0 because tax is already in Price
+            "TaxPercent": 0.0,  # 0 because prices already include tax
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "Price": 115.0,  # Tax-inclusive price (base 100 + 15 tax)
                 "Quantity": 1,
                 "DiscountAmount": 0.0,
             }],
@@ -1357,9 +1350,9 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
 
         self.assertIsNone(error)
         self.assertIsNotNone(pos_order)
-        # Tax calculation depends on Odoo configuration, just verify order was created
-        # The Tax value is passed in from the webhook data (15.0)
+        # Verify order was created with correct tax-inclusive total
         self.assertTrue(pos_order.exists())
+        self.assertEqual(pos_order.amount_total, 115.0)
 
     def test_process_pos_order_with_discount(self):
         """Test order with discount"""
