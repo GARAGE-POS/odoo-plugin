@@ -1317,8 +1317,8 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
         """Test order with tax - webhook prices are tax-inclusive"""
         # Note: Webhook sends final (tax-inclusive) prices
         # Price in OrderItems is the tax-inclusive unit price
-        # Tax field shows the tax amount (informational)
-        # TaxPercent=0 because tax is already included in Price
+        # Tax/TaxPercent should be 0 when prices already include tax
+        # (to avoid double-counting in validation)
 
         data = {
             "OrderID": 8007,
@@ -1326,12 +1326,12 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
             "AmountPaid": "115.0",
             "AmountTotal": 115.0,
             "GrandTotal": 115.0,
-            "Tax": 15.0,  # Informational: 15 of the 115 total is tax
+            "Tax": 0.0,  # 0 because tax is already in Price
             "TaxPercent": 0.0,  # 0 because prices already include tax
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 115.0,  # Tax-inclusive price
+                "Price": 115.0,  # Tax-inclusive price (base 100 + 15 tax)
                 "Quantity": 1,
                 "DiscountAmount": 0.0,
             }],
