@@ -347,7 +347,7 @@ class APIController(http.Controller):
             idempotency_record = result
 
             # 7. Validate required fields
-            required_fields = ["OrderID", "OrderItems", "CheckoutDetails", "AmountTotal", "AmountPaid"]
+            required_fields = ["OrderID", "OrderItems", "CheckoutDetails"]
             missing_fields = [field for field in required_fields if field not in data]
             if missing_fields:
                 return self._error_response(
@@ -536,7 +536,7 @@ class APIController(http.Controller):
                 # Use savepoint for atomic per-order processing
                 with request.env.cr.savepoint():
                     # Validate required fields for this order
-                    required_fields = ["OrderID", "OrderItems", "CheckoutDetails", "AmountTotal", "AmountPaid"]
+                    required_fields = ["OrderID", "OrderItems", "CheckoutDetails"]
                     missing_fields = [field for field in required_fields if field not in order_data]
 
                     if missing_fields:
@@ -725,13 +725,6 @@ class APIController(http.Controller):
             # Parse OrderDate
             order_datetime = self._parse_order_datetime(data.get("OrderDate"))
 
-            # Validate data consistency
-            consistency_error = self._validate_data_consistency(data, pos_session, config_param)
-            if consistency_error:
-                return None, consistency_error
-
-            # Parse amounts for later use
-            amount_paid = float(str(data.get("AmountPaid", 0)).replace(",", ""))
             rounding = pos_session.config_id.currency_id.rounding
 
             # Prepare order lines
@@ -743,7 +736,7 @@ class APIController(http.Controller):
 
             # Prepare payment lines
             payment_lines, payment_error = self._prepare_payment_lines(
-                data.get("CheckoutDetails", []), pos_session, amount_paid, rounding
+                data.get("CheckoutDetails", []), pos_session
             )
             if payment_error:
                 return None, payment_error
@@ -1336,10 +1329,9 @@ class APIController(http.Controller):
 
         return fallback_payment_mode, fallback_payment_method_id
 
-    def _prepare_payment_lines(self, checkout_details, pos_session, expected_amount, rounding):
+    def _prepare_payment_lines(self, checkout_details, pos_session):
         """Prepare payment lines from checkout details"""
         payment_lines = []
-        total_paid = 0.0
 
         # Get configuration
         fallback_payment_mode, fallback_payment_method_id = self._get_payment_config()
@@ -1374,7 +1366,6 @@ class APIController(http.Controller):
                     "message": f"Journal not found for payment method: {payment_method.name}"
                 }
 
-            total_paid += amount
             payment_lines.append((0, 0, {
                 "payment_method_id": payment_method.id,
                 "amount": amount,
@@ -1383,14 +1374,5 @@ class APIController(http.Controller):
 
         if not payment_lines:
             return None, {"status": 400, "message": "No valid payment lines created"}
-
-        if abs(total_paid - expected_amount) > rounding:
-            return None, {
-                "status": 400,
-                "message": (
-                    f"Payment inconsistency: Sum of CheckoutDetails ({total_paid}) "
-                    f"does not match AmountPaid ({expected_amount})"
-                )
-            }
 
         return payment_lines, None
