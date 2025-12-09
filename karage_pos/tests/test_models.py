@@ -655,6 +655,66 @@ class TestPosOrder(TransactionCase, KaragePosTestCommon):
         self.assertFalse(pos_order.external_order_source)
         self.assertFalse(pos_order.external_order_date)
 
+    def test_should_create_picking_real_time_external_order(self):
+        """Test that external orders force real-time picking creation"""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "external_order_id": "PICKING-TEST-123",
+            "external_order_source": "karage_pos_webhook",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # External orders should always return True for real-time picking
+        self.assertTrue(pos_order._should_create_picking_real_time())
+
+    def test_should_create_picking_real_time_non_external_order(self):
+        """Test that non-external orders defer to standard behavior"""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # Non-external order should follow standard behavior
+        # (depends on session's update_stock_at_closing setting)
+        self.assertFalse(pos_order.external_order_source)
+        # Just ensure the method doesn't error - actual result depends on config
+        result = pos_order._should_create_picking_real_time()
+        self.assertIsInstance(result, bool)
+
 
 @tagged("post_install", "-at_install")
 class TestResConfigSettings(TransactionCase, KaragePosTestCommon):

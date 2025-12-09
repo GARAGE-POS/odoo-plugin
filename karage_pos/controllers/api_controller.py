@@ -1137,6 +1137,7 @@ class APIController(http.Controller):
 
             order_lines.append((0, 0, {
                 "product_id": product.id,
+                "full_product_name": product.display_name,
                 "qty": quantity,
                 "price_unit": price,
                 "discount": discount_percent,
