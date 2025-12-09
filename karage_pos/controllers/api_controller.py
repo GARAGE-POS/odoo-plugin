@@ -770,7 +770,7 @@ class APIController(http.Controller):
                 "user_id": pos_session.user_id.id,
                 "date_order": order_datetime,  # Use external timestamp
                 "partner_id": False,
-                "to_invoice": False,
+                "to_invoice": True,
                 "lines": order_lines,
                 "amount_total": final_total,
                 "amount_tax": final_tax,
@@ -809,6 +809,12 @@ class APIController(http.Controller):
                 pos_order._create_order_picking()
             except Exception as e:
                 _logger.warning(f"Could not create picking for order {pos_order.name}: {str(e)}")
+
+            # Generate invoice for accounting entries
+            try:
+                pos_order.action_pos_order_invoice()
+            except Exception as e:
+                _logger.warning(f"Could not create invoice for order {pos_order.name}: {str(e)}")
 
             return pos_order, None
 
