@@ -19,3 +19,14 @@ class PosOrder(models.Model):
         string="External Order Date",
         help="Order date from external system"
     )
+
+    def _should_create_picking_real_time(self):
+        """Override to force real-time picking for external/webhook orders.
+
+        External orders (from webhooks) should always create pickings immediately
+        to deduct inventory, regardless of session's update_stock_at_closing setting.
+        This ensures inventory is accurate when orders come from external systems.
+        """
+        if self.external_order_source:
+            return True
+        return super()._should_create_picking_real_time()

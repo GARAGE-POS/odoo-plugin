@@ -337,6 +337,43 @@ Real POS order data is available in `tests/sample_request.json` for realistic te
 - Complete audit trail for debugging and compliance purposes
 - Should be cleaned up periodically via cron jobs
 
+## Deployment
+
+### Deploying with GitHub Actions
+
+The project includes a GitHub Actions workflow for deploying the module to version-specific branches (17.0, 18.0, 19.0). Each branch contains only the `karage_pos` module, optimized for that Odoo version.
+
+#### How to Deploy
+
+1. Go to the repository on GitHub
+2. Navigate to **Actions** → **Deploy to Version Branches**
+3. Click **Run workflow**
+4. Select the target version:
+   - `all` - Deploy to all supported versions (17.0, 18.0, 19.0)
+   - `17.0` - Deploy only to Odoo 17
+   - `18.0` - Deploy only to Odoo 18
+   - `19.0` - Deploy only to Odoo 19
+5. Click **Run workflow** to start the deployment
+
+#### What Happens During Deployment
+
+- The workflow creates an orphan branch for each selected version
+- The `karage_pos` module is copied from the `main` branch
+- Version-specific transformations are applied (for 17.0 and 19.0)
+- The branch is force-pushed to the remote repository
+
+#### Installing from Version Branches
+
+After deployment, you can install the module directly from a version branch:
+
+```bash
+# Clone the specific version branch
+git clone -b 18.0 https://github.com/GARAGE-POS/odoo-plugin.git /path/to/addons/karage_pos
+
+# Or add as a submodule
+git submodule add -b 18.0 https://github.com/GARAGE-POS/odoo-plugin.git addons/karage_pos
+```
+
 ## Troubleshooting
 
 ### Common Issues
