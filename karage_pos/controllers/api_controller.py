@@ -769,7 +769,7 @@ class APIController(http.Controller):
                 ),
                 "user_id": pos_session.user_id.id,
                 "date_order": order_datetime,  # Use external timestamp
-                "partner_id": False,
+                "partner_id": self._get_default_pos_partner(pos_session),
                 "to_invoice": True,
                 "lines": order_lines,
                 "amount_total": final_total,
@@ -804,17 +804,37 @@ class APIController(http.Controller):
                 _logger.error(f"Error confirming POS order: {str(e)}", exc_info=True)
                 return None, {"status": 500, "message": f"Failed to confirm order: {str(e)}"}
 
-            # Create picking for inventory
-            try:
-                pos_order._create_order_picking()
-            except Exception as e:
-                _logger.warning(f"Could not create picking for order {pos_order.name}: {str(e)}")
-
             # Generate invoice for accounting entries
+            # Note: action_pos_order_invoice() may create a picking for anglo-saxon accounting
             try:
                 pos_order.action_pos_order_invoice()
+                # Register payment on the invoice using the POS payment method's journal
+                if pos_order.account_move:
+                    invoice = pos_order.account_move
+                    if invoice.state == 'posted' and invoice.amount_residual > 0:
+                        for payment in pos_order.payment_ids:
+                            if payment.payment_method_id.journal_id:
+                                payment_register = request.env['account.payment.register'].sudo().with_context(
+                                    active_model='account.move',
+                                    active_ids=invoice.ids,
+                                ).create({
+                                    'journal_id': payment.payment_method_id.journal_id.id,
+                                    'amount': payment.amount,
+                                    'payment_date': pos_order.date_order.date() if pos_order.date_order else fields.Date.today(),
+                                })
+                                payment_register.action_create_payments()
+                                _logger.info(f"Registered payment for invoice {invoice.name} using journal {payment.payment_method_id.journal_id.name}")
             except Exception as e:
                 _logger.warning(f"Could not create invoice for order {pos_order.name}: {str(e)}")
+
+            # Create picking for inventory ONLY if not already created by invoice
+            # action_pos_order_invoice() creates picking for anglo-saxon accounting,
+            # so we only create one here if none exists to avoid double inventory deduction
+            try:
+                if not pos_order.picking_ids:
+                    pos_order._create_order_picking()
+            except Exception as e:
+                _logger.warning(f"Could not create picking for order {pos_order.name}: {str(e)}")
 
             return pos_order, None
 
@@ -855,13 +875,37 @@ class APIController(http.Controller):
 
         return calculated_total_with_tax, calculated_tax
 
+    def _get_default_pos_partner(self, pos_session):
+        """
+        Get default partner for POS orders (required for invoicing)
+
+        :param pos_session: POS session record
+        :return: partner ID
+        """
+        # Find or create a generic POS customer
+        partner_env = request.env["res.partner"].sudo()
+        pos_customer = partner_env.search([
+            ("name", "=", "POS Customer"),
+            ("company_id", "in", [pos_session.company_id.id, False]),
+        ], limit=1)
+
+        if not pos_customer:
+            pos_customer = partner_env.create({
+                "name": "POS Customer",
+                "company_id": pos_session.company_id.id,
+                "customer_rank": 1,
+            })
+            _logger.info(f"Created default POS Customer partner: {pos_customer.id}")
+
+        return pos_customer.id
+
     def _get_or_create_external_session(self):
         """
         Get or create a POS session for external webhook integration
 
         Strategy:
         1. Get the configured POS config from settings
-        2. Look for an open session for that config
+        2. Look for an open session for that config (any user)
         3. Create a new session if needed
         4. Return the session
 
@@ -897,17 +941,62 @@ class APIController(http.Controller):
             _logger.error(f"Configured POS config ID {pos_config_id} does not exist")
             return None
 
-        # 1. Check if there's already an open session for this config
-        existing_session = pos_session_env.search([
+        # 1. Check if there's already an open session for this config (any user)
+        # Search for ALL non-closed sessions to handle conflicts
+        all_config_sessions = pos_session_env.search([
             ("config_id", "=", pos_config.id),
-            ("state", "in", acceptable_states),
-        ], limit=1)
+            ("state", "not in", ["closed"]),
+        ], order="id desc")
 
-        if existing_session:
-            _logger.info(f"Found existing open session for config {pos_config.name}: {existing_session.name}")
-            return existing_session
+        # Also check if there are ANY open sessions for ANY config (for debugging)
+        all_open_sessions = pos_session_env.search([
+            ("state", "not in", ["closed"]),
+        ])
+        if all_open_sessions:
+            _logger.info(
+                f"All open POS sessions: {[(s.name, s.config_id.id, s.config_id.name, s.state) for s in all_open_sessions]}"
+            )
 
-        # 2. Create a new session for external sync
+        if all_config_sessions:
+            _logger.info(
+                f"Sessions for config {pos_config.name}: "
+                f"{[(s.name, s.state) for s in all_config_sessions]}"
+            )
+
+            # Try to close sessions stuck in closing_control first
+            for session in all_config_sessions:
+                if session.state == "closing_control":
+                    try:
+                        _logger.info(f"Attempting to close stuck session: {session.name}")
+                        session.action_pos_session_closing_control()
+                        _logger.info(f"Successfully closed session: {session.name}")
+                    except Exception as e:
+                        _logger.warning(f"Could not close session {session.name}: {str(e)}")
+
+            # Re-search for usable sessions after cleanup
+            usable_session = pos_session_env.search([
+                ("config_id", "=", pos_config.id),
+                ("state", "in", acceptable_states),
+            ], order="id desc", limit=1)
+
+            if usable_session:
+                _logger.info(f"Using session: {usable_session.name} (state: {usable_session.state})")
+                return usable_session
+
+            # Try to open a new_session state session
+            new_state_session = pos_session_env.search([
+                ("config_id", "=", pos_config.id),
+                ("state", "=", "new_session"),
+            ], limit=1)
+            if new_state_session:
+                try:
+                    new_state_session.action_pos_session_open()
+                    _logger.info(f"Opened session: {new_state_session.name}")
+                    return new_state_session
+                except Exception as e:
+                    _logger.warning(f"Could not open session: {str(e)}")
+
+        # 2. No existing session found - create a new one
         try:
             # Use the current request user for the session
             session_user_id = request.env.user.id
@@ -923,6 +1012,15 @@ class APIController(http.Controller):
             return new_session
 
         except Exception as e:
+            # If creation fails due to existing session, try to find it again
+            _logger.warning(f"Failed to create POS session: {str(e)}. Searching for existing session...")
+            existing_session = pos_session_env.search([
+                ("config_id", "=", pos_config.id),
+                ("state", "not in", ["closed"]),
+            ], order="id desc", limit=1)
+            if existing_session:
+                _logger.info(f"Found session after creation failure: {existing_session.name} (state: {existing_session.state})")
+                return existing_session
             _logger.error(f"Failed to create POS session for external sync: {str(e)}", exc_info=True)
             return None
 
