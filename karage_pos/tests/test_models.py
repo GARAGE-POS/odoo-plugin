@@ -697,7 +697,7 @@ class TestPosOrder(TransactionCase, KaragePosTestCommon):
         }
 
         # Case 1: update_stock_at_closing is True, so picking should NOT be created in real-time.
-        self.pos_session.config_id.update_stock_at_closing = True
+        self.pos_session.update_stock_at_closing = True
         pos_order_1 = self.env["pos.order"].create(base_order_data)
         self.assertFalse(
             pos_order_1._should_create_picking_real_time(),
@@ -705,7 +705,7 @@ class TestPosOrder(TransactionCase, KaragePosTestCommon):
         )
 
         # Case 2: update_stock_at_closing is False, so picking SHOULD be created in real-time.
-        self.pos_session.config_id.update_stock_at_closing = False
+        self.pos_session.update_stock_at_closing = False
         pos_order_2 = self.env["pos.order"].create(base_order_data)
         self.assertTrue(
             pos_order_2._should_create_picking_real_time(),
