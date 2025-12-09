@@ -685,35 +685,32 @@ class TestPosOrder(TransactionCase, KaragePosTestCommon):
         self.assertTrue(pos_order._should_create_picking_real_time())
 
     def test_should_create_picking_real_time_non_external_order(self):
-        """Test that non-external orders defer to standard behavior"""
-        pos_order = self.env["pos.order"].create({
+        """Test that non-external orders defer to standard behavior."""
+        base_order_data = {
             "session_id": self.pos_session.id,
             "config_id": self.pos_config.id,
             "company_id": self.pos_config.company_id.id,
             "pricelist_id": self.pos_config.pricelist_id.id,
             "amount_total": 100.0,
-            "amount_paid": 100.0,
-            "amount_tax": 0.0,
-            "amount_return": 0.0,
-            "lines": [(0, 0, {
-                "product_id": self.product1.id,
-                "qty": 1,
-                "price_unit": 100.0,
-                "price_subtotal": 100.0,
-                "price_subtotal_incl": 100.0,
-            })],
-            "payment_ids": [(0, 0, {
-                "payment_method_id": self.payment_method_cash.id,
-                "amount": 100.0,
-            })],
-        })
+            "lines": [(0, 0, {"product_id": self.product1.id, "qty": 1, "price_unit": 100.0})],
+            "payment_ids": [(0, 0, {"payment_method_id": self.payment_method_cash.id, "amount": 100.0})],
+        }
 
-        # Non-external order should follow standard behavior
-        # (depends on session's update_stock_at_closing setting)
-        self.assertFalse(pos_order.external_order_source)
-        # Just ensure the method doesn't error - actual result depends on config
-        result = pos_order._should_create_picking_real_time()
-        self.assertIsInstance(result, bool)
+        # Case 1: update_stock_at_closing is True, so picking should NOT be created in real-time.
+        self.pos_session.config_id.update_stock_at_closing = True
+        pos_order_1 = self.env["pos.order"].create(base_order_data)
+        self.assertFalse(
+            pos_order_1._should_create_picking_real_time(),
+            "Should be False when update_stock_at_closing is True."
+        )
+
+        # Case 2: update_stock_at_closing is False, so picking SHOULD be created in real-time.
+        self.pos_session.config_id.update_stock_at_closing = False
+        pos_order_2 = self.env["pos.order"].create(base_order_data)
+        self.assertTrue(
+            pos_order_2._should_create_picking_real_time(),
+            "Should be True when update_stock_at_closing is False."
+        )
 
 
 @tagged("post_install", "-at_install")
