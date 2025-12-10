@@ -14,7 +14,7 @@ IR_CONFIG_PARAMETER = "ir.config_parameter"
 
 
 class APIController(http.Controller):
-    """REST API Controller for webhook endpoint"""
+    """REST API Controller for bulk POS order webhook endpoint"""
 
     # ========== Helper Methods ==========
 
@@ -70,7 +70,7 @@ class APIController(http.Controller):
             return None
 
     def _update_log(self, webhook_log, status_code, message, success=False,
-                    pos_order=None, idempotency_record=None, start_time=None):
+                    pos_order=None, start_time=None):
         """Update webhook log with processing result"""
         if not webhook_log:
             return
@@ -85,32 +85,6 @@ class APIController(http.Controller):
             )
         except Exception as e:
             _logger.warning(f"Error updating webhook log: {str(e)}")
-
-    def _error_response(self, status, error_msg, webhook_log=None,
-                        idempotency_record=None, start_time=None):
-        """
-        Create error response and update logs
-
-        :param status: HTTP status code
-        :param error_msg: Error message
-        :param webhook_log: Webhook log record to update
-        :param idempotency_record: Idempotency record to mark as failed
-        :param start_time: Request start time for duration calculation
-        :return: JSON error response
-        """
-        # Update idempotency record if exists
-        if idempotency_record:
-            try:
-                idempotency_record.mark_failed(error_message=error_msg)
-            except Exception as e:
-                _logger.warning(f"Error updating idempotency record: {str(e)}")
-
-        # Update webhook log
-        self._update_log(webhook_log, status, error_msg, False,
-                         idempotency_record=idempotency_record, start_time=start_time)
-
-        # Return JSON response
-        return self._json_response(None, status=status, error=error_msg)
 
     def _json_response(self, data, status=200, error=None):
         """Return standardized JSON response"""
@@ -167,238 +141,7 @@ class APIController(http.Controller):
         _logger.warning("API key check failed for all scopes")
         return False, "Invalid or missing API key"
 
-    def _handle_completed_idempotency(self, idempotency_record, idempotency_key,
-                                      webhook_log, start_time, log_truncate_len):
-        """Handle idempotency record in completed status - return cached response"""
-        _logger.info(
-            f"Duplicate request detected: {idempotency_key[:log_truncate_len]}... "
-            f"Returning cached response for OrderID: {idempotency_record.order_id}"
-        )
-        self._update_log(
-            webhook_log, 200, "Duplicate request - returning cached response",
-            True, idempotency_record.pos_order_id, idempotency_record, start_time
-        )
-
-        # Parse and return cached response
-        if idempotency_record.response_data:
-            try:
-                cached_data = json.loads(idempotency_record.response_data)
-                return False, self._json_response(cached_data, status=200)
-            except (ValueError, TypeError):
-                pass
-
-        # Fallback response
-        pos_order = idempotency_record.pos_order_id
-        return False, self._json_response({
-            "id": pos_order.id if pos_order else None,
-            "name": pos_order.name if pos_order else None,
-            "message": "Request already processed",
-            "idempotency_key": idempotency_key,
-        }, status=200)
-
-    def _handle_processing_idempotency(self, idempotency_record, idempotency_key,
-                                       webhook_log, start_time, log_truncate_len):
-        """Handle idempotency record in processing status - check for timeout or reject"""
-        from datetime import datetime, timedelta
-
-        if idempotency_record.create_date:
-            timeout_minutes = int(
-                request.env[IR_CONFIG_PARAMETER]
-                .sudo()
-                .get_param("karage_pos.idempotency_processing_timeout", default="5")
-            )
-            processing_timeout = timedelta(minutes=timeout_minutes)
-
-            if datetime.now() - idempotency_record.create_date > processing_timeout:
-                _logger.warning(
-                    f"Idempotency record stuck in processing state: "
-                    f"{idempotency_key[:log_truncate_len]}... Allowing retry."
-                )
-                idempotency_record.write({"status": "processing"})
-                return True, idempotency_record
-
-        # Still processing
-        _logger.warning(f"Request already being processed: {idempotency_key[:log_truncate_len]}...")
-        self._update_log(
-            webhook_log, 409, "Request is already being processed. Please wait.",
-            False, idempotency_record=idempotency_record, start_time=start_time
-        )
-        return False, self._json_response(
-            None, status=409, error="Request is already being processed. Please wait."
-        )
-
-    def _check_idempotency(self, idempotency_key, order_id, webhook_log, start_time):
-        """
-        Check idempotency and return cached response if duplicate
-
-        :param idempotency_key: Idempotency key from request
-        :param order_id: External order ID
-        :param webhook_log: Webhook log record
-        :param start_time: Request start time
-        :return: Tuple of (should_process: bool, response_or_record)
-                 - If should_process=False, response_or_record is the HTTP response to return
-                 - If should_process=True, response_or_record is the idempotency record
-        """
-        if not idempotency_key:
-            return True, None
-
-        # Get or create idempotency record atomically
-        idempotency_record, created = (
-            request.env["karage.pos.webhook.log"]
-            .sudo()
-            .get_or_create_log(
-                idempotency_key,
-                order_id=str(order_id),
-                status="processing",
-            )
-        )
-
-        # Get log truncation length from config
-        config_param = request.env[IR_CONFIG_PARAMETER].sudo()
-        log_truncate_len = int(config_param.get_param("karage_pos.log_key_truncation_length", "20"))
-
-        if created:
-            _logger.info(f"New request with idempotency key: {idempotency_key[:log_truncate_len]}...")
-            return True, idempotency_record
-
-        # Dispatch based on record status
-        status = idempotency_record.status
-        if status == "completed":
-            return self._handle_completed_idempotency(
-                idempotency_record, idempotency_key, webhook_log, start_time, log_truncate_len
-            )
-        if status == "processing":
-            return self._handle_processing_idempotency(
-                idempotency_record, idempotency_key, webhook_log, start_time, log_truncate_len
-            )
-        if status == "failed":
-            _logger.info(f"Retrying previously failed request: {idempotency_key[:log_truncate_len]}...")
-            idempotency_record.mark_processing()
-            return True, idempotency_record
-
-        return True, idempotency_record
-
     # ========== Main Endpoint ==========
-
-    @http.route(
-        "/api/v1/webhook/pos-order",
-        type="http",
-        auth="none",
-        methods=["POST"],
-        csrf=False,
-        cors="*",
-    )
-    def webhook_pos_order(self, **kwargs):
-        """
-        Webhook endpoint to create POS order from external system
-
-        Expected JSON format:
-        {
-            "OrderID": 639,
-            "AmountPaid": "92.0",
-            "AmountTotal": 80.0,
-            "GrandTotal": 92.0,
-            "Tax": 12.0,
-            "TaxPercent": 15.0,
-            "CheckoutDetails": [...],
-            "OrderItems": [...]
-        }
-        """
-        start_time = time.time()
-        webhook_log = None
-        idempotency_record = None
-
-        try:
-            # 1. Validate HTTP method
-            if request.httprequest.method != "POST":
-                return self._json_response(
-                    None, status=405, error="Method not allowed. Only POST requests are accepted."
-                )
-
-            # 2. Parse request body
-            data, error = self._parse_request_body()
-            if error:
-                webhook_log = self._create_webhook_log(
-                    request.httprequest.data.decode("utf-8", errors="ignore") if request.httprequest.data else "{}"
-                )
-                return self._error_response(400, error, webhook_log, start_time=start_time)
-
-            # 3. Extract headers
-            idempotency_key = self._get_header_or_body(
-                data, "Idempotency-Key", "X-Idempotency-Key", "idempotency_key", "IdempotencyKey"
-            )
-            api_key = self._get_header_or_body(data, "X-API-KEY", "X-API-Key", "api_key")
-
-            # 4. Create webhook log
-            webhook_log = self._create_webhook_log(data, idempotency_key)
-
-            # 5. Authenticate API key
-            authenticated, auth_error = self._authenticate_api_key(api_key)
-            if not authenticated:
-                return self._error_response(401, auth_error, webhook_log, start_time=start_time)
-
-            # 6. Check idempotency
-            should_process, result = self._check_idempotency(
-                idempotency_key, data.get("OrderID", ""), webhook_log, start_time
-            )
-            if not should_process:
-                return result  # Return cached response or error
-
-            idempotency_record = result
-
-            # 7. Validate required fields
-            required_fields = ["OrderID", "OrderItems", "CheckoutDetails", "AmountTotal", "AmountPaid"]
-            missing_fields = [field for field in required_fields if field not in data]
-            if missing_fields:
-                return self._error_response(
-                    400, f'Missing required fields: {", ".join(missing_fields)}',
-                    webhook_log, idempotency_record, start_time
-                )
-
-            # 8. Process the order
-            pos_order, order_error = self._process_pos_order(data)
-            if order_error:
-                return self._error_response(
-                    order_error.get("status", 500), order_error.get("message"),
-                    webhook_log, idempotency_record, start_time
-                )
-
-            # 9. Prepare success response
-            response_data = {
-                "id": pos_order.id,
-                "name": pos_order.name,
-                "pos_reference": pos_order.pos_reference,
-                "amount_total": pos_order.amount_total,
-                "amount_paid": pos_order.amount_paid,
-                "amount_tax": pos_order.amount_tax,
-                "state": pos_order.state,
-                "date_order": str(pos_order.date_order),
-                "external_order_id": data.get("OrderID"),
-            }
-
-            # 10. Update idempotency record
-            if idempotency_record:
-                try:
-                    idempotency_record.mark_completed(
-                        pos_order_id=pos_order, response_data=json.dumps(response_data)
-                    )
-                except Exception as e:
-                    _logger.warning(f"Error updating idempotency record: {str(e)}")
-
-            # 11. Update webhook log with success
-            self._update_log(
-                webhook_log, 200, json.dumps(response_data), True,
-                pos_order, idempotency_record, start_time
-            )
-
-            return self._json_response(response_data)
-
-        except Exception as e:
-            _logger.error(f"Unexpected error in webhook_pos_order: {str(e)}", exc_info=True)
-            return self._error_response(
-                500, f"Internal server error: {str(e)}",
-                webhook_log, idempotency_record, start_time
-            )
 
     @http.route(
         "/api/v1/webhook/pos-order/bulk",

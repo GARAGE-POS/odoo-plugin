@@ -1,7 +1,7 @@
 {
     "name": "Karage POS Integration",
     "summary": "REST API endpoints for syncing orders from Karage to Odoo POS",
-    "version": "18.0.0.1",
+    "version": "18.0.0.2",
     "development_status": "Beta",
     "category": "Sales/Point of Sale",
     "website": "https://karage.co",
@@ -26,4 +26,5 @@
     "installable": True,
     "application": True,
     "auto_install": False,
+    "post_init_hook": "post_init_hook",
 }

@@ -7,6 +7,22 @@
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
                 <app string="Karage POS" name="karage_pos">
+                    <!-- Default POS Info Banner -->
+                    <div class="alert alert-warning mb-4" role="status">
+                        <h5><i class="fa fa-info-circle"/> Default Karage POS Configuration</h5>
+                        <p>
+                            A default POS configuration (<strong>KARAGE - Default POS</strong>) was created during module installation.
+                            This POS <strong>cannot be deleted</strong> as it is required for webhook integration.
+                        </p>
+                        <p class="mb-1">
+                            <strong>Important:</strong> You must manually configure:
+                        </p>
+                        <ul class="mb-0">
+                            <li><strong>Payment Method Journals</strong> - Go to Point of Sale &gt; Configuration &gt; Payment Methods</li>
+                            <li><strong>Tax Settings</strong> - Go to Accounting &gt; Configuration &gt; Taxes</li>
+                        </ul>
+                    </div>
+
                     <!-- POS Configuration -->
                     <block title="POS Configuration" name="karage_pos_config">
                         <setting string="External POS Configuration" name="external_pos_config_setting">
