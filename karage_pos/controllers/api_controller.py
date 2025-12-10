@@ -347,7 +347,7 @@ class APIController(http.Controller):
             idempotency_record = result
 
             # 7. Validate required fields
-            required_fields = ["OrderID", "OrderItems", "CheckoutDetails"]
+            required_fields = ["OrderItems", "CheckoutDetails"]
             missing_fields = [field for field in required_fields if field not in data]
             if missing_fields:
                 return self._error_response(
@@ -536,7 +536,7 @@ class APIController(http.Controller):
                 # Use savepoint for atomic per-order processing
                 with request.env.cr.savepoint():
                     # Validate required fields for this order
-                    required_fields = ["OrderID", "OrderItems", "CheckoutDetails"]
+                    required_fields = ["OrderItems", "CheckoutDetails"]
                     missing_fields = [field for field in required_fields if field not in order_data]
 
                     if missing_fields:
@@ -596,23 +596,6 @@ class APIController(http.Controller):
             return {
                 "status": 400,
                 "message": f'Journal not found for payment method(s): {", ".join(missing_journals)}'
-            }
-        return None
-
-    def _check_duplicate_order(self, external_order_id, external_order_source):
-        """Check if order already exists"""
-        if not external_order_id:
-            return None
-
-        existing = request.env["pos.order"].sudo().search([
-            ("external_order_id", "=", external_order_id),
-            ("external_order_source", "=", external_order_source),
-        ], limit=1)
-
-        if existing:
-            return {
-                "status": 400,
-                "message": f"Duplicate order: OrderID {external_order_id} already exists as {existing.name}"
             }
         return None
 
@@ -711,11 +694,8 @@ class APIController(http.Controller):
                 "karage_pos.external_order_source_code", "karage_pos_webhook"
             )
 
-            # Check for duplicate external order ID
+            # Get external order ID (optional label)
             external_order_id = str(data.get("OrderID", ""))
-            duplicate_error = self._check_duplicate_order(external_order_id, external_order_source)
-            if duplicate_error:
-                return None, duplicate_error
 
             # Validate OrderStatus
             status_error = self._validate_order_status(data.get("OrderStatus"))
@@ -724,8 +704,6 @@ class APIController(http.Controller):
 
             # Parse OrderDate
             order_datetime = self._parse_order_datetime(data.get("OrderDate"))
-
-            rounding = pos_session.config_id.currency_id.rounding
 
             # Prepare order lines
             order_lines, lines_error = self._prepare_order_lines(
