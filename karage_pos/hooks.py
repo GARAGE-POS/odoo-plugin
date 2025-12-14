@@ -23,7 +23,7 @@ def post_init_hook(env):
     This runs once after module installation and creates:
     - Default Karage POS configuration (one per company)
     - Required payment methods (without journals)
-    - Sets default config parameters
+    - Sets karage_pos.external_pos_config_id config parameter
     """
     _logger.info("Running Karage POS post-installation hook...")
 

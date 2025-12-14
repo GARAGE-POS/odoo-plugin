@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Filtered action for Karage POS Sessions -->
+    <record id="action_karage_pos_session_filtered" model="ir.actions.act_window">
+        <field name="name">Sessions</field>
+        <field name="res_model">pos.session</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{
+            'search_default_config_id': [active_id],
+            'default_config_id': active_id}
+        </field>
+    </record>
+
+    <!-- Filtered action for Karage POS Orders -->
+    <record id="action_karage_pos_order_filtered" model="ir.actions.act_window">
+        <field name="name">Orders</field>
+        <field name="res_model">pos.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{
+            'search_default_config_id': [active_id],
+            'default_config_id': active_id}
+        </field>
+    </record>
+
+    <!-- Filtered action for Karage POS Orders Analysis -->
+    <record id="action_karage_pos_report_order_filtered" model="ir.actions.act_window">
+        <field name="name">Orders Analysis</field>
+        <field name="res_model">report.pos.order</field>
+        <field name="view_mode">graph,pivot</field>
+        <field name="context">{
+            'search_default_config_id': [active_id],
+            'default_config_id': active_id}
+        </field>
+    </record>
+
+    <!-- Karage POS Simplified Settings Form View -->
+    <record id="view_karage_pos_config_settings_form" model="ir.ui.view">
+        <field name="name">karage.pos.config.settings.form</field>
+        <field name="model">pos.config</field>
+        <field name="arch" type="xml">
+            <form string="POS Settings">
+                <sheet>
+                    <group>
+                        <group string="Payment">
+                            <field name="payment_method_ids" widget="many2many_tags"/>
+                        </group>
+                        <group string="Accounting">
+                            <field name="journal_id" options="{'no_create': True, 'no_open': True}"/>
+                            <field name="invoice_journal_id" options="{'no_create': True, 'no_open': True}"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Inventory">
+                            <field name="picking_type_id" options="{'no_create': True, 'no_open': True}"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Save" type="object" name="write" class="btn-primary" close="1"/>
+                    <button string="Discard" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action for Karage POS Settings -->
+    <record id="action_karage_pos_settings" model="ir.actions.act_window">
+        <field name="name">POS Settings</field>
+        <field name="res_model">pos.config</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_karage_pos_config_settings_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Karage POS Dashboard Kanban View -->
+    <record id="view_karage_pos_config_kanban" model="ir.ui.view">
+        <field name="name">karage.pos.config.kanban.view</field>
+        <field name="model">pos.config</field>
+        <field name="arch" type="xml">
+            <kanban create="false" class="o_kanban_dashboard o_pos_kanban">
+                <field name="name"/>
+                <field name="current_session_id"/>
+                <field name="current_session_state"/>
+                <field name="last_session_closing_date"/>
+                <field name="last_session_closing_cash"/>
+                <field name="pos_session_username"/>
+                <field name="currency_id"/>
+                <field name="is_karage_default_pos"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div>
+                            <div class="o_kanban_card_header">
+                                <div class="o_kanban_card_header_title">
+                                    <div class="o_primary">
+                                        <t t-esc="record.name.value"/>
+                                        <span t-if="record.is_karage_default_pos.raw_value" class="badge text-bg-info ms-2">Default</span>
+                                    </div>
+                                    <div class="o_secondary">
+                                        <t t-if="record.pos_session_username.value">
+                                            <t t-esc="record.pos_session_username.value"/>
+                                        </t>
+                                        <t t-else="">Unused</t>
+                                    </div>
+                                </div>
+                                <div class="o_kanban_manage_button_section">
+                                    <a class="o_kanban_manage_toggle_button" href="#"><i class="fa fa-ellipsis-v"/></a>
+                                </div>
+                            </div>
+                            <div class="container o_kanban_card_content">
+                                <div class="row">
+                                    <div class="col-6 o_kanban_primary_left">
+                                        <!-- Continue Selling when session is opened -->
+                                        <button t-if="record.current_session_state.raw_value === 'opened'" class="btn btn-primary" name="open_ui" type="object">Continue Selling</button>
+
+                                        <!-- Open Register for other states or no session -->
+                                        <button t-if="record.current_session_state.raw_value !== 'opened'" class="btn btn-primary" name="open_ui" type="object">Open Register</button>
+
+                                        <!-- Close button when in closing_control -->
+                                        <button t-if="record.current_session_state.raw_value === 'closing_control'" class="btn btn-secondary ms-2" name="open_existing_session_cb" type="object">Close</button>
+                                    </div>
+                                    <div class="col-6 o_kanban_primary_right">
+                                        <!-- Last Closing Date -->
+                                        <div t-if="record.last_session_closing_date.value" class="row mb-1">
+                                            <div class="col-6">
+                                                <span class="text-muted">Last Closing</span>
+                                            </div>
+                                            <div class="col-6 text-end">
+                                                <span><t t-esc="record.last_session_closing_date.value"/></span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Cash Balance -->
+                                        <div t-if="record.last_session_closing_cash.value" class="row">
+                                            <div class="col-6">
+                                                <span class="text-muted">Cash Balance</span>
+                                            </div>
+                                            <div class="col-6 text-end">
+                                                <span><t t-esc="record.last_session_closing_cash.value"/></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="container o_kanban_card_manage_pane dropdown-menu" role="menu">
+                                <div class="row">
+                                    <div class="col-6 o_kanban_card_manage_section o_kanban_manage_view">
+                                        <div class="o_kanban_card_manage_title">
+                                            <span>View</span>
+                                        </div>
+                                        <div>
+                                            <a name="%(action_karage_pos_session_filtered)d" type="action">Sessions</a>
+                                        </div>
+                                        <div>
+                                            <a name="%(action_karage_pos_order_filtered)d" type="action">Orders</a>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 o_kanban_card_manage_section o_kanban_manage_new">
+                                        <div class="o_kanban_card_manage_title">
+                                            <span>Reporting</span>
+                                        </div>
+                                        <div>
+                                            <a name="%(action_karage_pos_report_order_filtered)d" type="action">Orders Analysis</a>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="o_kanban_card_manage_settings row">
+                                    <div class="col-12 text-end">
+                                        <a name="action_open_karage_settings" type="object">Settings</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Main Dashboard Action - Shows ONLY Karage POS Configurations -->
+    <record id="action_karage_pos_dashboard" model="ir.actions.act_window">
+        <field name="name">Karage POS Dashboard</field>
+        <field name="res_model">pos.config</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="view_id" ref="view_karage_pos_config_kanban"/>
+        <field name="domain">[('name', '=ilike', 'KARAGE%')]</field>
+        <field name="context">{'create': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No Karage POS Configuration Found
+            </p>
+            <p>
+                The default Karage POS configuration should have been created during installation.
+                If you don't see any POS here, please check the installation logs or contact support.
+            </p>
+        </field>
+    </record>
+
+</odoo>

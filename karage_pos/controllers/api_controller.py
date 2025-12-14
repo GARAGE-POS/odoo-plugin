@@ -900,22 +900,6 @@ class APIController(http.Controller):
 
         return order_lines, None
 
-    def _find_payment_method_by_mapping(self, payment_mapping_env, payment_mode, pos_session):
-        """Find payment method using database mapping"""
-        mapping = payment_mapping_env.search([
-            ("external_code", "=", payment_mode),
-            ("active", "=", True)
-        ], limit=1)
-
-        if mapping and mapping.payment_method_id:
-            if mapping.payment_method_id in pos_session.payment_method_ids:
-                return mapping.payment_method_id
-            _logger.warning(
-                f"Payment method '{mapping.payment_method_id.name}' from mapping "
-                f"is not available in POS session. Trying fallbacks."
-            )
-        return None
-
     def _find_payment_method_by_card_type(self, card_type, pos_session):
         """Find payment method by CardType in journal name"""
         if not card_type:
@@ -940,28 +924,21 @@ class APIController(http.Controller):
         return pos_session.payment_method_ids.filtered(lambda p: p.is_cash_count)[:1] or None
 
     def _resolve_payment_method(self, payment_mode, card_type, pos_session,
-                                payment_mapping_env, fallback_payment_method_id):
+                                fallback_payment_method_id):
         """Resolve payment method using multiple strategies"""
-        # Strategy 1: Database mapping
-        payment_method = self._find_payment_method_by_mapping(
-            payment_mapping_env, payment_mode, pos_session
-        )
-        if payment_method:
-            return payment_method
-
-        # Strategy 2: CardType in journal name
+        # Strategy 1: CardType in journal name
         payment_method = self._find_payment_method_by_card_type(card_type, pos_session)
         if payment_method:
             return payment_method
 
-        # Strategy 3: Fallback from config
+        # Strategy 2: Fallback from config
         payment_method = self._find_payment_method_by_fallback(
             fallback_payment_method_id, pos_session
         )
         if payment_method:
             return payment_method
 
-        # Strategy 4: Cash for payment mode 1
+        # Strategy 3: Cash for payment mode 1
         return self._find_cash_payment_method(payment_mode, pos_session)
 
     def _get_payment_config(self):
@@ -988,7 +965,6 @@ class APIController(http.Controller):
 
         # Get configuration
         fallback_payment_mode, fallback_payment_method_id = self._get_payment_config()
-        payment_mapping_env = request.env["karage.pos.payment.mapping"].sudo()
 
         for checkout in checkout_details:
             payment_mode = checkout.get("PaymentMode", fallback_payment_mode)
@@ -1001,7 +977,7 @@ class APIController(http.Controller):
             # Resolve payment method using multiple strategies
             payment_method = self._resolve_payment_method(
                 payment_mode, card_type, pos_session,
-                payment_mapping_env, fallback_payment_method_id
+                fallback_payment_method_id
             )
 
             if not payment_method:
@@ -1009,7 +985,7 @@ class APIController(http.Controller):
                     "status": 400,
                     "message": (
                         f'No payment method found for PaymentMode={payment_mode}, CardType={card_type}. '
-                        f'Please configure payment mappings in Settings > Karage POS.'
+                        f'Please configure payment methods in Settings > Karage POS or check your fallback payment method.'
                     )
                 }
 

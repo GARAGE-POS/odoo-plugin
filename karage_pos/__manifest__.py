@@ -18,8 +18,8 @@
     ],
     "data": [
         "security/ir.model.access.csv",
+        "views/karage_pos_dashboard.xml",
         "views/webhook_log_views.xml",
-        "views/karage_pos_payment_mapping_views.xml",
         "views/res_config_settings_views.xml",
     ],
     "images": ["static/description/banner.png"],

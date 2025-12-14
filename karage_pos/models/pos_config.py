@@ -44,3 +44,16 @@ class PosConfig(models.Model):
                     'This POS must remain as the default for webhook integration.'
                 ))
         return super().write(vals)
+
+    def action_open_karage_settings(self):
+        """Open the simplified Karage POS settings dialog"""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('POS Settings'),
+            'res_model': 'pos.config',
+            'res_id': self.id,
+            'view_mode': 'form',
+            'view_id': self.env.ref('karage_pos.view_karage_pos_config_settings_form').id,
+            'target': 'new',
+        }

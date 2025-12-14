@@ -110,7 +110,8 @@
     <menuitem id="menu_karage_pos_root"
               name="Karage POS"
               sequence="50"
-              web_icon="karage_pos,static/description/icon.png"/>
+              web_icon="karage_pos,static/description/icon.png"
+              action="karage_pos.action_karage_pos_dashboard"/>
 
     <!-- Webhook Logs submenu -->
     <menuitem id="menu_webhook_log"

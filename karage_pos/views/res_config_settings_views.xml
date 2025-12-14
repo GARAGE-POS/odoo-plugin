@@ -38,6 +38,13 @@
                                 Comma-separated list of valid POS session states (e.g., "opened,opening_control").
                             </div>
                         </setting>
+                        <setting string="Default POS Receivable Account" name="default_pos_receivable_account_setting">
+                            <field name="account_default_pos_receivable_account_id" options="{'no_create': True}"/>
+                            <div class="text-muted">
+                                Temporary receivable account used for POS customer payments.
+                                This account is used to track payments before they are reconciled.
+                            </div>
+                        </setting>
                     </block>
 
                     <!-- Payment Configuration -->
@@ -52,18 +59,6 @@
                             <field name="fallback_payment_method_id"/>
                             <div class="text-muted">
                                 Fallback payment method when no mapping exists for the external payment code.
-                            </div>
-                        </setting>
-                        <setting string="Payment Mappings" name="payment_mappings_setting">
-                            <div class="mt-2">
-                                <button name="%(karage_pos.karage_pos_payment_mapping_action)d"
-                                        type="action"
-                                        string="Configure Payment Mappings"
-                                        class="btn-link"
-                                        icon="fa-credit-card"/>
-                            </div>
-                            <div class="text-muted">
-                                Map external payment codes to Odoo POS payment methods.
                             </div>
                         </setting>
                     </block>

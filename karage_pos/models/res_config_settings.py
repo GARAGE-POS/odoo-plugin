@@ -10,6 +10,15 @@ class ResConfigSettings(models.TransientModel):
     # POS Configuration Section
     # ==========================================
 
+    account_default_pos_receivable_account_id = fields.Many2one(
+        'account.account',
+        string='Default POS Receivable Account',
+        related='company_id.account_default_pos_receivable_account_id',
+        readonly=False,
+        help='Default receivable account used for POS payments. '
+             'This is a temporary account used to track POS customer payments.'
+    )
+
     external_pos_config_id = fields.Many2one(
         'pos.config',
         string='External POS Configuration',
