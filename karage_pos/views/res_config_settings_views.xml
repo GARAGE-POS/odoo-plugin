@@ -25,40 +25,11 @@
 
                     <!-- POS Configuration -->
                     <block title="POS Configuration" name="karage_pos_config">
-                        <setting string="External POS Configuration" name="external_pos_config_setting">
-                            <field name="external_pos_config_id"/>
-                            <div class="text-muted">
-                                Select the POS configuration to use for webhook orders.
-                                <strong>This is required for the webhook integration to work.</strong>
-                            </div>
-                        </setting>
-                        <setting string="Acceptable Session States" name="acceptable_session_states_setting">
-                            <field name="acceptable_session_states"/>
-                            <div class="text-muted">
-                                Comma-separated list of valid POS session states (e.g., "opened,opening_control").
-                            </div>
-                        </setting>
                         <setting string="Default POS Receivable Account" name="default_pos_receivable_account_setting">
                             <field name="account_default_pos_receivable_account_id" options="{'no_create': True}"/>
                             <div class="text-muted">
                                 Temporary receivable account used for POS customer payments.
                                 This account is used to track payments before they are reconciled.
-                            </div>
-                        </setting>
-                    </block>
-
-                    <!-- Payment Configuration -->
-                    <block title="Payment Configuration" name="karage_pos_payment_config">
-                        <setting string="Default Payment Mode" name="fallback_payment_mode_setting">
-                            <field name="fallback_payment_mode"/>
-                            <div class="text-muted">
-                                Default external payment mode code when not provided in webhook.
-                            </div>
-                        </setting>
-                        <setting string="Default Payment Method" name="fallback_payment_method_setting">
-                            <field name="fallback_payment_method_id"/>
-                            <div class="text-muted">
-                                Fallback payment method when no mapping exists for the external payment code.
                             </div>
                         </setting>
                     </block>
@@ -77,38 +48,10 @@
                                 Multiplier for currency rounding tolerance in data consistency checks.
                             </div>
                         </setting>
-                        <setting string="Tax Calculation Priority" name="tax_calculation_priority_setting">
-                            <field name="tax_calculation_priority"/>
-                            <div class="text-muted">
-                                When both tax percent and tax amount are provided, which to use first.
-                            </div>
-                        </setting>
                         <setting string="Valid Order Statuses" name="valid_order_statuses_setting">
                             <field name="valid_order_statuses"/>
                             <div class="text-muted">
                                 Comma-separated list of valid OrderStatus values (e.g., "103,104").
-                            </div>
-                        </setting>
-                    </block>
-
-                    <!-- Product Validation -->
-                    <block title="Product Validation" name="karage_pos_product_validation">
-                        <setting string="Require Sale OK" name="product_require_sale_ok_setting">
-                            <field name="product_require_sale_ok"/>
-                            <div class="text-muted">
-                                Only accept products where "Can be Sold" is enabled.
-                            </div>
-                        </setting>
-                        <setting string="Require Available in POS" name="product_require_available_in_pos_setting">
-                            <field name="product_require_available_in_pos"/>
-                            <div class="text-muted">
-                                Only accept products where "Available in POS" is enabled.
-                            </div>
-                        </setting>
-                        <setting string="Enforce Company Match" name="enforce_product_company_match_setting">
-                            <field name="enforce_product_company_match"/>
-                            <div class="text-muted">
-                                Require products to belong to the same company as the POS session.
                             </div>
                         </setting>
                     </block>

@@ -76,12 +76,19 @@ class APIController(http.Controller):
             return
 
         try:
+            # Determine status based on success/failure
+            if success:
+                status = "completed"
+            else:
+                status = "failed"
+
             webhook_log.update_log_result(
                 status_code=status_code,
                 response_message=message,
                 success=success,
                 pos_order_id=pos_order,
                 processing_time=time.time() - start_time if start_time else None,
+                status=status,
             )
         except Exception as e:
             _logger.warning(f"Error updating webhook log: {str(e)}")

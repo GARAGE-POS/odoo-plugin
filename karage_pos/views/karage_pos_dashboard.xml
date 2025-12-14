@@ -82,11 +82,13 @@
                 <field name="name"/>
                 <field name="current_session_id"/>
                 <field name="current_session_state"/>
-                <field name="last_session_closing_date"/>
-                <field name="last_session_closing_cash"/>
                 <field name="pos_session_username"/>
-                <field name="currency_id"/>
                 <field name="is_karage_default_pos"/>
+                <!-- Accounting & Inventory Settings -->
+                <field name="journal_id"/>
+                <field name="invoice_journal_id"/>
+                <field name="picking_type_id"/>
+                <field name="payment_method_ids"/>
                 <templates>
                     <t t-name="kanban-box">
                         <div>
@@ -110,33 +112,61 @@
                             <div class="container o_kanban_card_content">
                                 <div class="row">
                                     <div class="col-6 o_kanban_primary_left">
-                                        <!-- Continue Selling when session is opened -->
-                                        <button t-if="record.current_session_state.raw_value === 'opened'" class="btn btn-primary" name="open_ui" type="object">Continue Selling</button>
-
-                                        <!-- Open Register for other states or no session -->
-                                        <button t-if="record.current_session_state.raw_value !== 'opened'" class="btn btn-primary" name="open_ui" type="object">Open Register</button>
-
-                                        <!-- Close button when in closing_control -->
-                                        <button t-if="record.current_session_state.raw_value === 'closing_control'" class="btn btn-secondary ms-2" name="open_existing_session_cb" type="object">Close</button>
+                                        <!-- Session Status (read-only, automatic sessions) -->
+                                        <div t-if="record.current_session_state.raw_value === 'opened'" class="badge text-bg-success fs-6">
+                                            <i class="fa fa-check-circle me-1"/>Session Active
+                                        </div>
+                                        <div t-elif="record.current_session_state.raw_value === 'opening_control'" class="badge text-bg-warning fs-6">
+                                            <i class="fa fa-clock-o me-1"/>Opening...
+                                        </div>
+                                        <div t-elif="record.current_session_state.raw_value === 'closing_control'" class="badge text-bg-info fs-6">
+                                            <i class="fa fa-clock-o me-1"/>Closing...
+                                        </div>
+                                        <div t-else="" class="badge text-bg-secondary fs-6">
+                                            <i class="fa fa-pause-circle me-1"/>No Active Session
+                                        </div>
+                                        <div class="text-muted mt-2 small">
+                                            <i class="fa fa-info-circle me-1"/>Sessions are managed automatically
+                                        </div>
                                     </div>
                                     <div class="col-6 o_kanban_primary_right">
-                                        <!-- Last Closing Date -->
-                                        <div t-if="record.last_session_closing_date.value" class="row mb-1">
-                                            <div class="col-6">
-                                                <span class="text-muted">Last Closing</span>
+                                        <!-- Accounting Settings -->
+                                        <div class="mb-2">
+                                            <div class="fw-bold text-muted small mb-1">
+                                                <i class="fa fa-book me-1"/>Accounting
                                             </div>
-                                            <div class="col-6 text-end">
-                                                <span><t t-esc="record.last_session_closing_date.value"/></span>
+                                            <div class="small">
+                                                <span class="text-muted">Sales Journal: </span>
+                                                <span t-if="record.journal_id.value" t-esc="record.journal_id.value"/>
+                                                <span t-else="" class="text-danger">Not configured</span>
+                                            </div>
+                                            <div class="small">
+                                                <span class="text-muted">Invoice Journal: </span>
+                                                <span t-if="record.invoice_journal_id.value" t-esc="record.invoice_journal_id.value"/>
+                                                <span t-else="" class="text-warning">Not configured</span>
                                             </div>
                                         </div>
 
-                                        <!-- Cash Balance -->
-                                        <div t-if="record.last_session_closing_cash.value" class="row">
-                                            <div class="col-6">
-                                                <span class="text-muted">Cash Balance</span>
+                                        <!-- Inventory Settings -->
+                                        <div class="mb-2">
+                                            <div class="fw-bold text-muted small mb-1">
+                                                <i class="fa fa-cubes me-1"/>Inventory
                                             </div>
-                                            <div class="col-6 text-end">
-                                                <span><t t-esc="record.last_session_closing_cash.value"/></span>
+                                            <div class="small">
+                                                <span class="text-muted">Operation Type: </span>
+                                                <span t-if="record.picking_type_id.value" t-esc="record.picking_type_id.value"/>
+                                                <span t-else="" class="text-danger">Not configured</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Payment Methods -->
+                                        <div>
+                                            <div class="fw-bold text-muted small mb-1">
+                                                <i class="fa fa-credit-card me-1"/>Payment Methods
+                                            </div>
+                                            <div class="small">
+                                                <span t-if="record.payment_method_ids.raw_value.length > 0" t-esc="record.payment_method_ids.value"/>
+                                                <span t-else="" class="text-danger">No payment methods</span>
                                             </div>
                                         </div>
                                     </div>

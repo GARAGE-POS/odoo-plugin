@@ -4,7 +4,7 @@
         <field name="name">karage.pos.webhook.log.list</field>
         <field name="model">karage.pos.webhook.log</field>
         <field name="arch" type="xml">
-            <list string="Webhook Logs" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'processing'">
+            <list string="Webhook Logs" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'processing'" decoration-muted="status == 'pending'">
                 <field name="receive_date"/>
                 <field name="order_id"/>
                 <field name="idempotency_key"/>
@@ -74,14 +74,16 @@
                 <field name="idempotency_key"/>
                 <field name="ip_address"/>
                 <field name="pos_order_id"/>
+                <filter string="Pending" name="pending" domain="[('status', '=', 'pending')]"/>
+                <filter string="Processing" name="processing" domain="[('status', '=', 'processing')]"/>
                 <filter string="Completed" name="completed" domain="[('status', '=', 'completed')]"/>
                 <filter string="Failed" name="failed" domain="[('status', '=', 'failed')]"/>
-                <filter string="Processing" name="processing" domain="[('status', '=', 'processing')]"/>
                 <filter string="Today" name="today" domain="[('receive_date', '>=', datetime.datetime.now().replace(hour=0, minute=0, second=0))]"/>
                 <separator/>
                 <filter string="This Week" name="this_week" domain="[('receive_date', '>=', (datetime.datetime.now() - datetime.timedelta(days=7)))]"/>
                 <filter string="This Month" name="this_month" domain="[('receive_date', '>=', (datetime.datetime.now() - datetime.timedelta(days=30)))]"/>
                 <group expand="0" string="Group By">
+                    <filter string="Status" name="group_by_status" context="{'group_by': 'status'}"/>
                     <filter string="Receive Date" name="group_by_receive_date" context="{'group_by': 'receive_date'}"/>
                     <filter string="Status Code" name="group_by_status_code" context="{'group_by': 'status_code'}"/>
                     <filter string="Success" name="group_by_success" context="{'group_by': 'success'}"/>
@@ -120,4 +122,3 @@
               action="action_webhook_log"
               sequence="10"/>
 </odoo>
-
