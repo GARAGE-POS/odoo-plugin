@@ -226,6 +226,8 @@
         <field name="arch" type="xml">
             <form string="Karage POS Configuration">
                 <sheet>
+                    <!-- Hidden field required for picking_type_id domain -->
+                    <field name="company_id" invisible="1"/>
                     <div class="oe_title">
                         <label for="name" string="POS Name"/>
                         <h1>
@@ -234,7 +236,6 @@
                     </div>
                     <group>
                         <group string="Basic Information">
-                            <field name="company_id" options="{'no_create': True}" groups="base.group_multi_company"/>
                             <field name="is_karage_default_pos" readonly="1"/>
                         </group>
                     </group>
