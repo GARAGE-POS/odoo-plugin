@@ -37,6 +37,27 @@ class ResConfigSettings(models.TransientModel):
     )
 
     # ==========================================
+    # Session Auto-Close Configuration
+    # ==========================================
+
+    auto_close_sessions = fields.Boolean(
+        string='Auto-Close Idle Sessions',
+        default=True,
+        config_parameter='karage_pos.auto_close_sessions',
+        help='Automatically close POS sessions after a period of inactivity. '
+             'When enabled, sessions with no new orders for the configured '
+             'timeout period will be automatically closed by a scheduled job.'
+    )
+
+    session_idle_timeout_minutes = fields.Integer(
+        string='Session Idle Timeout (minutes)',
+        default=60,
+        config_parameter='karage_pos.session_idle_timeout_minutes',
+        help='Number of minutes of inactivity before a session is automatically closed. '
+             'Default: 60 minutes (1 hour). Set to 0 to disable auto-closing.'
+    )
+
+    # ==========================================
     # Payment Configuration Section
     # ==========================================
 

@@ -18,6 +18,7 @@
     ],
     "data": [
         "security/ir.model.access.csv",
+        "data/ir_cron.xml",
         "views/karage_pos_dashboard.xml",
         "views/webhook_log_views.xml",
         "views/res_config_settings_views.xml",

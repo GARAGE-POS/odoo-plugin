@@ -34,6 +34,28 @@
                         </setting>
                     </block>
 
+                    <!-- Session Auto-Close Configuration -->
+                    <block title="Session Auto-Close" name="karage_pos_session_auto_close">
+                        <setting string="Auto-Close Idle Sessions" name="auto_close_sessions_setting">
+                            <field name="auto_close_sessions"/>
+                            <div class="text-muted">
+                                Automatically close POS sessions after a period of inactivity.
+                                Sessions with no new orders will be closed by a scheduled job (runs every 15 minutes).
+                            </div>
+                        </setting>
+                        <setting string="Session Idle Timeout" name="session_idle_timeout_setting"
+                                 invisible="not auto_close_sessions">
+                            <div class="row mt-2">
+                                <label class="col-3 col-form-label" for="session_idle_timeout_minutes"/>
+                                <field name="session_idle_timeout_minutes" class="col-2"/>
+                                <span class="col-7 text-muted mt-2">minutes (default: 60)</span>
+                            </div>
+                            <div class="text-muted">
+                                Number of minutes of inactivity before a session is automatically closed.
+                            </div>
+                        </setting>
+                    </block>
+
                     <!-- Order Processing -->
                     <block title="Order Processing" name="karage_pos_order_processing">
                         <setting string="External Order Source Code" name="external_order_source_code_setting">

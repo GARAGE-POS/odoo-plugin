@@ -147,33 +147,24 @@ class KaragePosTestCommon:
             'karage_pos.external_pos_config_id', str(cls.pos_config.id)
         )
 
-        # Sample webhook data
+        # Sample webhook data (simplified format - no amount totals)
         cls.sample_webhook_data = {
             "OrderID": 12345,
-            "AmountDiscount": 0.0,
-            "AmountPaid": "100.0",
-            "AmountTotal": 100.0,
-            "BalanceAmount": 0.0,
-            "GrandTotal": 100.0,
-            "Tax": 0.0,
-            "TaxPercent": 0.0,
+            "OrderDate": "2025-08-10T17:16:43+00:00",
             "OrderStatus": 103,
-            "PaymentMode": 1,
-            "CheckoutDetails": [
-                {
-                    "PaymentMode": 1,
-                    "AmountPaid": "100.0",
-                    "CardType": "Cash",
-                    "ReferenceID": "REF123",
-                }
-            ],
             "OrderItems": [
                 {
                     "ItemID": cls.product1.id,
-                    "ItemName": cls.product1.name,
                     "Price": 100.0,
-                    "Quantity": 1.0,
-                    "DiscountAmount": 0.0,
+                    "Quantity": 1,
+                    "DiscountAmount": 0,
+                }
+            ],
+            "CheckoutDetails": [
+                {
+                    "PaymentMode": 1,
+                    "AmountPaid": 100.0,
+                    "CardType": "Cash",
                 }
             ],
         }

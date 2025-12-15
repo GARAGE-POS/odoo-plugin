@@ -162,14 +162,30 @@ class APIController(http.Controller):
         """
         Bulk webhook endpoint to create multiple POS orders
 
-        Expected JSON format:
-        {
-            "orders": [
-                { /* order 1 data */ },
-                { /* order 2 data */ },
-                ...
-            ]
-        }
+        Expected JSON format (array of orders):
+        [
+            {
+                "OrderID": "11112111",
+                "OrderDate": "2025-08-10T17:16:43+00:00",
+                "OrderStatus": 103,
+                "OrderItems": [
+                    {
+                        "ItemID": 35722,
+                        "Price": 18.75,
+                        "Quantity": 1,
+                        "DiscountAmount": 0
+                    }
+                ],
+                "CheckoutDetails": [
+                    {
+                        "PaymentMode": 1,
+                        "AmountPaid": 18.75,
+                        "CardType": "Cash"
+                    }
+                ]
+            },
+            ...
+        ]
 
         Returns HTTP 200 if all succeed
         Returns HTTP 207 (Multi-Status) if partial success
@@ -190,8 +206,9 @@ class APIController(http.Controller):
             if error:
                 return self._json_response(None, status=400, error=error)
 
-            # 3. Extract API key
-            api_key = self._get_header_or_body(data, "X-API-KEY", "X-API-Key", "api_key")
+            # 3. Extract API key from headers (not from body since body is now an array)
+            api_key = (request.httprequest.headers.get("X-API-KEY")
+                       or request.httprequest.headers.get("X-API-Key"))
 
             # 4. Create webhook log
             webhook_log = self._create_webhook_log(data)
@@ -202,17 +219,13 @@ class APIController(http.Controller):
                 self._update_log(webhook_log, 401, auth_error, False, start_time=start_time)
                 return self._json_response(None, status=401, error=auth_error)
 
-            # 6. Validate required fields
-            if "orders" not in data:
-                error_msg = 'Missing required field: "orders"'
+            # 6. Validate payload is an array of orders
+            if not isinstance(data, list):
+                error_msg = 'Request body must be an array of orders'
                 self._update_log(webhook_log, 400, error_msg, False, start_time=start_time)
                 return self._json_response(None, status=400, error=error_msg)
 
-            orders_data = data.get("orders", [])
-            if not isinstance(orders_data, list):
-                error_msg = '"orders" must be an array'
-                self._update_log(webhook_log, 400, error_msg, False, start_time=start_time)
-                return self._json_response(None, status=400, error=error_msg)
+            orders_data = data
 
             # 7. Check bulk size limit
             max_orders = int(
@@ -285,8 +298,8 @@ class APIController(http.Controller):
             try:
                 # Use savepoint for atomic per-order processing
                 with request.env.cr.savepoint():
-                    # Validate required fields for this order
-                    required_fields = ["OrderID", "OrderItems", "CheckoutDetails", "AmountTotal", "AmountPaid"]
+                    # Validate required fields for this order (simplified - no amount fields required)
+                    required_fields = ["OrderID", "OrderItems", "CheckoutDetails"]
                     missing_fields = [field for field in required_fields if field not in order_data]
 
                     if missing_fields:
@@ -404,41 +417,6 @@ class APIController(http.Controller):
             _logger.warning(f"Could not parse OrderDate: {order_date}. Using current time.")
             return fields.Datetime.now()
 
-    def _validate_data_consistency(self, data, pos_session, config_param):
-        """Validate order amounts consistency"""
-        amount_paid = float(str(data.get("AmountPaid", 0)).replace(",", ""))
-        grand_total = float(data.get("GrandTotal", 0))
-        tax = float(data.get("Tax", 0))
-        tax_percent = float(data.get("TaxPercent", 0))
-        balance_amount = float(data.get("BalanceAmount", 0))
-
-        currency = pos_session.config_id.currency_id
-        rounding = currency.rounding
-        consistency_multiplier = float(config_param.get_param(
-            "karage_pos.consistency_check_multiplier", "10.0"
-        ))
-
-        calculated_total, _ = self._calculate_totals(
-            data.get("OrderItems", []), tax_percent, tax, config_param
-        )
-
-        if abs(calculated_total - grand_total) > rounding * consistency_multiplier:
-            return {
-                "status": 400,
-                "message": f"Data inconsistency: Calculated total ({calculated_total}) "
-                           f"does not match GrandTotal ({grand_total})"
-            }
-
-        tolerance = rounding * consistency_multiplier
-        if abs(amount_paid - grand_total) > tolerance and balance_amount > rounding:
-            return {
-                "status": 400,
-                "message": f"Data inconsistency: AmountPaid ({amount_paid}) + "
-                           f"BalanceAmount ({balance_amount}) should equal GrandTotal ({grand_total})"
-            }
-
-        return None
-
     def _process_pos_order(self, data):
         """
         Process POS order from webhook data
@@ -475,15 +453,6 @@ class APIController(http.Controller):
             # Parse OrderDate
             order_datetime = self._parse_order_datetime(data.get("OrderDate"))
 
-            # Validate data consistency
-            consistency_error = self._validate_data_consistency(data, pos_session, config_param)
-            if consistency_error:
-                return None, consistency_error
-
-            # Parse amounts for later use
-            amount_paid = float(str(data.get("AmountPaid", 0)).replace(",", ""))
-            rounding = pos_session.config_id.currency_id.rounding
-
             # Prepare order lines
             order_lines, lines_error = self._prepare_order_lines(
                 data.get("OrderItems", []), pos_session
@@ -493,20 +462,15 @@ class APIController(http.Controller):
 
             # Prepare payment lines
             payment_lines, payment_error = self._prepare_payment_lines(
-                data.get("CheckoutDetails", []), pos_session, amount_paid, rounding
+                data.get("CheckoutDetails", []), pos_session
             )
             if payment_error:
                 return None, payment_error
 
-            # Calculate final totals
-            final_total = sum(line[2]["price_subtotal_incl"] for line in order_lines)
-            final_tax = sum(
-                line[2]["price_subtotal_incl"] - line[2]["price_subtotal"]
-                for line in order_lines
-            )
+            # Use total from payment lines (sum of CheckoutDetails AmountPaid)
             total_paid = sum(line[2]["amount"] for line in payment_lines)
 
-            # Create POS order
+            # Create POS order - use payment total as the order total
             order_vals = {
                 "session_id": pos_session.id,
                 "config_id": pos_session.config_id.id,
@@ -522,10 +486,10 @@ class APIController(http.Controller):
                 "partner_id": False,
                 "to_invoice": True,
                 "lines": order_lines,
-                "amount_total": final_total,
-                "amount_tax": final_tax,
+                "amount_total": total_paid,
+                "amount_tax": 0.0,
                 "amount_paid": total_paid,
-                "amount_return": max(0.0, total_paid - final_total),
+                "amount_return": 0.0,
                 # External order tracking fields
                 "external_order_id": external_order_id,
                 "external_order_source": external_order_source,
@@ -571,39 +535,6 @@ class APIController(http.Controller):
         except Exception as e:
             _logger.error(f"Error processing POS order: {str(e)}", exc_info=True)
             return None, {"status": 500, "message": str(e)}
-
-    def _calculate_totals(self, order_items, tax_percent, tax, config_param=None):
-        """Calculate expected totals from order items"""
-        calculated_total = 0.0
-        for item in order_items:
-            item_price = float(item.get("Price", 0))
-            item_qty = float(item.get("Quantity", 1))
-            item_discount = float(item.get("DiscountAmount", 0))
-            calculated_total += (item_price * item_qty) - item_discount
-
-        # Get tax calculation priority from config
-        tax_priority = "percent_first"
-        if config_param:
-            tax_priority = config_param.get_param(
-                "karage_pos.tax_calculation_priority", "percent_first"
-            )
-
-        if tax_priority == "percent_first":
-            if tax_percent > 0:
-                calculated_tax = calculated_total * (tax_percent / 100.0)
-                calculated_total_with_tax = calculated_total + calculated_tax
-            else:
-                calculated_total_with_tax = calculated_total + tax
-                calculated_tax = tax
-        else:  # amount_first
-            if tax > 0:
-                calculated_total_with_tax = calculated_total + tax
-                calculated_tax = tax
-            else:
-                calculated_tax = calculated_total * (tax_percent / 100.0)
-                calculated_total_with_tax = calculated_total + calculated_tax
-
-        return calculated_total_with_tax, calculated_tax
 
     def _get_or_create_external_session(self):
         """
@@ -965,10 +896,12 @@ class APIController(http.Controller):
 
         return fallback_payment_mode, fallback_payment_method_id
 
-    def _prepare_payment_lines(self, checkout_details, pos_session, expected_amount, rounding):
-        """Prepare payment lines from checkout details"""
+    def _prepare_payment_lines(self, checkout_details, pos_session):
+        """Prepare payment lines from checkout details
+
+        Payment amounts are taken directly from CheckoutDetails.
+        """
         payment_lines = []
-        total_paid = 0.0
 
         # Get configuration
         fallback_payment_mode, fallback_payment_method_id = self._get_payment_config()
@@ -1002,7 +935,6 @@ class APIController(http.Controller):
                     "message": f"Journal not found for payment method: {payment_method.name}"
                 }
 
-            total_paid += amount
             payment_lines.append((0, 0, {
                 "payment_method_id": payment_method.id,
                 "amount": amount,
@@ -1011,14 +943,5 @@ class APIController(http.Controller):
 
         if not payment_lines:
             return None, {"status": 400, "message": "No valid payment lines created"}
-
-        if abs(total_paid - expected_amount) > rounding:
-            return None, {
-                "status": 400,
-                "message": (
-                    f"Payment inconsistency: Sum of CheckoutDetails ({total_paid}) "
-                    f"does not match AmountPaid ({expected_amount})"
-                )
-            }
 
         return payment_lines, None
