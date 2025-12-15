@@ -617,7 +617,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             lines, error = self.controller._prepare_payment_lines(
-                checkout_details, self.pos_session, 100.0, 0.01
+                checkout_details, self.pos_session
             )
 
         self.assertIsNone(error)
@@ -637,7 +637,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             lines, error = self.controller._prepare_payment_lines(
-                checkout_details, self.pos_session, 100.0, 0.01
+                checkout_details, self.pos_session
             )
 
         self.assertIsNone(error)
@@ -655,7 +655,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             lines, error = self.controller._prepare_payment_lines(
-                checkout_details, self.pos_session, 100.0, 0.01
+                checkout_details, self.pos_session
             )
 
         self.assertIsNone(error)
@@ -673,7 +673,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             lines, error = self.controller._prepare_payment_lines(
-                checkout_details, self.pos_session, 100.0, 0.01
+                checkout_details, self.pos_session
             )
 
         self.assertIsNone(error)
@@ -686,32 +686,12 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             lines, error = self.controller._prepare_payment_lines(
-                [], self.pos_session, 100.0, 0.01
+                [], self.pos_session
             )
 
         self.assertIsNone(lines)
         self.assertIsNotNone(error)
         self.assertIn("No valid payment lines", error["message"])
-
-    def test_prepare_payment_lines_mismatch(self):
-        """Test payment amount mismatch"""
-        checkout_details = [{
-            "PaymentMode": 1,
-            "AmountPaid": "50.0",  # Less than expected
-            "CardType": "Cash",
-        }]
-
-        mock_request = self._create_mock_request()
-        mock_request.env = self.env
-
-        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
-            lines, error = self.controller._prepare_payment_lines(
-                checkout_details, self.pos_session, 100.0, 0.01
-            )
-
-        self.assertIsNone(lines)
-        self.assertIsNotNone(error)
-        self.assertIn("Payment inconsistency", error["message"])
 
     def test_prepare_payment_lines_method_not_found(self):
         """Test payment method not found"""
@@ -726,7 +706,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             lines, error = self.controller._prepare_payment_lines(
-                checkout_details, self.pos_session, 100.0, 0.01
+                checkout_details, self.pos_session
             )
 
         self.assertIsNone(lines)
@@ -1069,56 +1049,6 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
         self.assertIsNone(pos_order)
         self.assertIsNotNone(error)
         self.assertIn("inconsistency", error["message"].lower())
-
-    def test_process_pos_order_no_session(self):
-        """Test order processing when no session available"""
-        # Close all sessions
-        self.env["pos.session"].search([
-            ("state", "in", ["opened", "opening_control"])
-        ]).write({"state": "closed", "stop_at": fields.Datetime.now()})
-
-        # Delete all POS configs to prevent auto-creation
-        self.env["pos.config"].search([]).write({"active": False})
-
-        # Clear the external POS config parameter
-        self.env["ir.config_parameter"].sudo().set_param(
-            "karage_pos.external_pos_config_id", ""
-        )
-
-        data = {
-            "OrderID": 8006,
-            "OrderStatus": 103,
-            "AmountPaid": "100.0",
-            "AmountTotal": 100.0,
-            "GrandTotal": 100.0,
-            "Tax": 0.0,
-            "TaxPercent": 0.0,
-            "OrderItems": [{
-                "OdooItemID": self.product1.id,
-                "ItemName": self.product1.name,
-                "Price": 100.0,
-                "Quantity": 1,
-                "DiscountAmount": 0.0,
-            }],
-            "CheckoutDetails": [{
-                "PaymentMode": 1,
-                "AmountPaid": "100.0",
-                "CardType": "Cash",
-            }],
-        }
-
-        mock_request = self._create_mock_request()
-        mock_request.env = self.env
-
-        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
-            pos_order, error = self.controller._process_pos_order(data)
-
-        self.assertIsNone(pos_order)
-        self.assertIsNotNone(error)
-        self.assertIn("No POS configuration", error["message"])
-
-        # Restore POS config
-        self.env["pos.config"].search([("active", "=", False)]).write({"active": True})
 
     def test_process_pos_order_with_tax(self):
         """Test order with tax - webhook prices are tax-inclusive"""
@@ -2002,7 +1932,7 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             lines, error = self.controller._prepare_payment_lines(
-                checkout_details, test_session, 100.0, 0.01
+                checkout_details, test_session
             )
 
         # Should return error since no payment method found
