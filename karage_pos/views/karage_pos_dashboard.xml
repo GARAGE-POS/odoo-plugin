@@ -82,7 +82,7 @@
         <field name="model">pos.config</field>
         <field name="priority">100</field>
         <field name="arch" type="xml">
-            <kanban create="true" delete="true" class="o_kanban_dashboard o_pos_kanban">
+            <kanban create="true" delete="true" quick_create="false" class="o_kanban_dashboard o_pos_kanban">
                 <field name="name"/>
                 <field name="current_session_id"/>
                 <field name="current_session_state"/>
