@@ -726,7 +726,7 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
 
         with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
             lines, error = self.controller._prepare_payment_lines(
-                checkout_details, self.pos_session, 1000.0, 0.01
+                checkout_details, self.pos_session
             )
 
         self.assertIsNone(error)
