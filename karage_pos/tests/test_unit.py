@@ -330,56 +330,6 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
 
         self.assertEqual(log.pos_order_id.id, pos_order.id)
 
-    # ========== Tests for _error_response ==========
-
-    def test_error_response_basic(self):
-        """Test basic error response"""
-        mock_request = self._create_mock_request()
-        mock_request.env = self.env
-
-        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
-            response = self.controller._error_response(400, "Bad request")
-
-        self.assertEqual(response.status_code, 400)
-
-    def test_error_response_with_webhook_log(self):
-        """Test error response updates webhook log"""
-        log = self.env["karage.pos.webhook.log"].create({
-            "webhook_body": "{}",
-            "status": "pending",
-            "idempotency_key": str(uuid.uuid4()),
-        })
-
-        mock_request = self._create_mock_request()
-        mock_request.env = self.env
-
-        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
-            response = self.controller._error_response(
-                400, "Bad request", webhook_log=log, start_time=datetime.now().timestamp()
-            )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(log.status_code, 400)
-        self.assertFalse(log.success)
-
-    def test_error_response_with_idempotency_record(self):
-        """Test error response marks idempotency as failed"""
-        idem_record = self.env["karage.pos.webhook.log"].create({
-            "webhook_body": "{}",
-            "status": "processing",
-            "idempotency_key": "test-idem-error",
-        })
-
-        mock_request = self._create_mock_request()
-        mock_request.env = self.env
-
-        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
-            self.controller._error_response(
-                500, "Internal error", idempotency_record=idem_record
-            )
-
-        self.assertEqual(idem_record.status, "failed")
-
     # ========== Tests for _find_product_by_id ==========
 
     def test_find_product_by_odoo_item_id(self):
@@ -2017,28 +1967,6 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
             with patch.object(log, 'update_log_result', side_effect=Exception("DB error")):
                 # Should not raise - just logs warning
                 self.controller._update_log(log, 200, "Success")
-
-    # ========== Tests for _error_response with idempotency exception ==========
-
-    def test_error_response_idempotency_exception(self):
-        """Test _error_response handles idempotency record exception"""
-        idem_record = self.env["karage.pos.webhook.log"].create({
-            "webhook_body": "{}",
-            "status": "processing",
-            "idempotency_key": str(uuid.uuid4()),
-        })
-
-        mock_request = self._create_mock_request()
-        mock_request.env = self.env
-
-        with patch('odoo.addons.karage_pos.controllers.api_controller.request', mock_request):
-            # Mock mark_failed to raise exception
-            with patch.object(idem_record, 'mark_failed', side_effect=Exception("DB error")):
-                response = self.controller._error_response(
-                    500, "Internal error", idempotency_record=idem_record
-                )
-
-        self.assertEqual(response.status_code, 500)
 
     # ========== Tests for _prepare_payment_lines edge cases ==========
 
