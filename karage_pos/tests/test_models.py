@@ -744,7 +744,7 @@ class TestResConfigSettings(TransactionCase, KaragePosTestCommon):
     def test_valid_order_statuses_default(self):
         """Test default valid order statuses"""
         settings = self.env["res.config.settings"].create({})
-        self.assertEqual(settings.valid_order_statuses, "103")
+        self.assertEqual(settings.valid_order_statuses, "103,104")
 
     def test_config_parameter_persistence(self):
         """Test that config parameters are persisted"""

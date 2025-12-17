@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
+from uuid import uuid4
 
 from odoo import api, fields, models
 
@@ -68,6 +69,13 @@ class PosOrder(models.Model):
             order_id = super()._process_order(order, draft_or_existing)
         except TypeError:
             # Odoo 17.0 signature (3 arguments)
+            # Odoo 17 expects order wrapped as {'data': order_data, ...}
+            if 'data' not in order:
+                order = {
+                    'data': order,
+                    'id': order.get('name', str(uuid4())),
+                    'to_invoice': order.get('to_invoice', False),
+                }
             order_id = super()._process_order(order, draft_or_existing, existing_order)
 
         return order_id

@@ -16,10 +16,7 @@ class PosConfig(models.Model):
 
     @api.constrains('name')
     def _check_karage_name_prefix(self):
-        """
-        Enforce KARAGE prefix for all Karage POS configurations.
-        This ensures consistency with the dashboard domain filter.
-        """
+        """Enforce KARAGE prefix for all Karage POS configurations."""
         for record in self:
             # Only check records that are being managed by Karage
             # (either marked as default or already have KARAGE prefix)
@@ -60,29 +57,3 @@ class PosConfig(models.Model):
                     'This POS must remain as the default for webhook integration.'
                 ))
         return super().write(vals)
-
-    def action_open_karage_settings(self):
-        """Open the simplified Karage POS settings dialog"""
-        self.ensure_one()
-        return {
-            'type': 'ir.actions.act_window',
-            'name': _('POS Settings'),
-            'res_model': 'pos.config',
-            'res_id': self.id,
-            'view_mode': 'form',
-            'view_id': self.env.ref('karage_pos.view_karage_pos_config_settings_form').id,
-            'target': 'new',
-        }
-
-    def action_edit_karage_pos(self):
-        """Open the full form view for editing Karage POS configuration"""
-        self.ensure_one()
-        return {
-            'type': 'ir.actions.act_window',
-            'name': _('Edit POS Configuration'),
-            'res_model': 'pos.config',
-            'res_id': self.id,
-            'view_mode': 'form',
-            'view_id': self.env.ref('karage_pos.view_karage_pos_config_form').id,
-            'target': 'current',
-        }
