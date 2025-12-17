@@ -597,11 +597,11 @@ class APIController(http.Controller):
             'sequence_number': randint(1, 99999),
             'last_order_preparation_change': '{}',
 
-            # Amounts
+            # Amounts - calculated from order lines, not payment
             'amount_paid': total_paid,
             'amount_return': 0,
             'amount_tax': total_amount_incl - total_amount_base,
-            'amount_total': total_paid,  # Use payment total as order total
+            'amount_total': total_amount_incl,  # Total including tax from order lines
 
             # Lines and payments (include both field names for version compatibility)
             'lines': order_lines,
@@ -680,11 +680,26 @@ class APIController(http.Controller):
             _logger.warning(f"Could not compute costs for order {pos_order.name}: {e}")
 
         # Generate invoice with savepoint (non-critical)
+        # Refresh to get current state after action_pos_order_paid
+        pos_order.invalidate_recordset(['state', 'account_move', 'to_invoice'])
         _logger.info(
             f"Invoice check for order {pos_order.name}: "
-            f"to_invoice={pos_order.to_invoice}, state={pos_order.state}, partner_id={pos_order.partner_id.id if pos_order.partner_id else False}"
+            f"to_invoice={pos_order.to_invoice}, state={pos_order.state}, "
+            f"partner_id={pos_order.partner_id.id if pos_order.partner_id else False}, "
+            f"account_move={pos_order.account_move.id if pos_order.account_move else False}"
         )
-        if pos_order.to_invoice and pos_order.state == 'paid' and pos_order.partner_id:
+        # Check if invoice should be created:
+        # - to_invoice flag is set
+        # - order is in completed state (paid, done, or invoiced)
+        # - partner exists
+        # - invoice doesn't already exist
+        should_invoice = (
+            pos_order.to_invoice
+            and pos_order.state in ('paid', 'done', 'invoiced')
+            and pos_order.partner_id
+            and not pos_order.account_move
+        )
+        if should_invoice:
             try:
                 with request.env.cr.savepoint():
                     pos_order._generate_pos_order_invoice()
@@ -695,14 +710,18 @@ class APIController(http.Controller):
         else:
             _logger.info(
                 f"Skipping invoice for order {pos_order.name}: "
-                f"to_invoice={pos_order.to_invoice}, state={pos_order.state}, partner_id={pos_order.partner_id.id if pos_order.partner_id else False}"
+                f"to_invoice={pos_order.to_invoice}, state={pos_order.state}, "
+                f"partner_id={pos_order.partner_id.id if pos_order.partner_id else False}, "
+                f"account_move_exists={bool(pos_order.account_move)}"
             )
 
-        # Mark order as 'done' to prevent session closing from reprocessing it
+        # Mark order with final state to prevent session closing from reprocessing it
         # This prevents duplicate pickings during action_pos_session_closing_control
         if pos_order.state == 'paid':
-            pos_order.write({'state': 'done'})
-            _logger.info(f"Order {pos_order.name} marked as done")
+            # If invoice was created, state should be 'invoiced', otherwise 'done'
+            final_state = 'invoiced' if pos_order.account_move else 'done'
+            pos_order.write({'state': final_state})
+            _logger.info(f"Order {pos_order.name} marked as {final_state}")
 
         return True
 
