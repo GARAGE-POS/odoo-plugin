@@ -228,9 +228,9 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["OrderItems"] = [
             {
                 "ItemID": 99999,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0,
+                "DiscountPercentage": 0,
             }
         ]
 
@@ -263,7 +263,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data = self.sample_webhook_data.copy()
         data["OrderID"] = 88886  # Unique order ID
         data["OrderItems"][0]["ItemID"] = self.product1.id
-        data["OrderItems"][0]["Price"] = 75.0  # Price determines total
+        data["OrderItems"][0]["PriceWithoutTax"] = 75.0  # Price determines total
         data["CheckoutDetails"][0]["AmountPaid"] = 75.0  # Match the item price
 
         response = self._make_webhook_request(data)
@@ -295,7 +295,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data = self.sample_webhook_data.copy()
         data["OrderID"] = 88887  # Unique order ID
         data["OrderItems"][0]["ItemID"] = self.product1.id
-        data["OrderItems"][0]["Price"] = 115.0  # Tax-inclusive price
+        data["OrderItems"][0]["PriceWithoutTax"] = 115.0  # Tax-inclusive price
         data["CheckoutDetails"][0]["AmountPaid"] = 115.0
 
         response = self._make_webhook_request(data)
@@ -311,7 +311,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data = self.sample_webhook_data.copy()
         data["OrderID"] = 88888  # Unique order ID
         data["OrderItems"][0]["ItemID"] = self.product1.id
-        data["OrderItems"][0]["DiscountAmount"] = 10.0
+        data["OrderItems"][0]["DiscountPercentage"] = 10.0
         data["CheckoutDetails"][0]["AmountPaid"] = 90.0  # 100 - 10 discount
 
         response = self._make_webhook_request(data)
@@ -330,15 +330,15 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["OrderItems"] = [
             {
                 "ItemID": self.product1.id,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 2,
-                "DiscountAmount": 0,
+                "DiscountPercentage": 0,
             },
             {
                 "ItemID": self.product2.id,
-                "Price": 50.0,
+                "PriceWithoutTax": 50.0,
                 "Quantity": 1,
-                "DiscountAmount": 0,
+                "DiscountPercentage": 0,
             },
         ]
         data["CheckoutDetails"][0]["AmountPaid"] = 250.0
@@ -570,9 +570,9 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
                 "OrderItems": [
                     {
                         "ItemID": self.product1.id,
-                        "Price": 100.0,
+                        "PriceWithoutTax": 100.0,
                         "Quantity": 1,
-                        "DiscountAmount": 0,
+                        "DiscountPercentage": 0,
                     }
                 ],
                 "CheckoutDetails": [
@@ -586,9 +586,9 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
                 "OrderItems": [
                     {
                         "ItemID": self.product2.id,
-                        "Price": 200.0,
+                        "PriceWithoutTax": 200.0,
                         "Quantity": 1,
-                        "DiscountAmount": 0,
+                        "DiscountPercentage": 0,
                     }
                 ],
                 "CheckoutDetails": [
@@ -621,9 +621,9 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
                 "OrderItems": [
                     {
                         "ItemID": self.product1.id,
-                        "Price": 100.0,
+                        "PriceWithoutTax": 100.0,
                         "Quantity": 1,
-                        "DiscountAmount": 0,
+                        "DiscountPercentage": 0,
                     }
                 ],
                 "CheckoutDetails": [
@@ -775,7 +775,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["OrderItems"][0]["OdooItemID"] = product_a.id
         data["OrderItems"][0]["ItemID"] = product_b.id
         data["OrderItems"][0]["ItemName"] = "Product B"
-        data["OrderItems"][0]["Price"] = 100.0
+        data["OrderItems"][0]["PriceWithoutTax"] = 100.0
         data["CheckoutDetails"][0]["AmountPaid"] = 100.0
 
         response = self._make_webhook_request(data)
@@ -850,9 +850,9 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         # Only provide ItemName, no IDs
         data["OrderItems"][0] = {
             "ItemName": self.product1.name,
-            "Price": 100.0,
+            "PriceWithoutTax": 100.0,
             "Quantity": 1,
-            "DiscountAmount": 0,
+            "DiscountPercentage": 0,
         }
 
         response = self._make_webhook_request(data)
@@ -880,9 +880,9 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         # Provide partial name for fuzzy match
         data["OrderItems"][0] = {
             "ItemName": "Fuzzy Product",
-            "Price": 75.0,
+            "PriceWithoutTax": 75.0,
             "Quantity": 1,
-            "DiscountAmount": 0,
+            "DiscountPercentage": 0,
         }
 
         response = self._make_webhook_request(data)
@@ -962,15 +962,15 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         self.assertIsNotNone(pos_order.date_order)
 
     def test_webhook_with_discount_percentage(self):
-        """Test webhook correctly calculates discount percentage"""
+        """Test webhook correctly applies discount percentage"""
         data = self.sample_webhook_data.copy()
         data["OrderID"] = 9056
         data["OrderStatus"] = 103
         data["OrderDate"] = "2025-11-27T10:00:00"
         data["OrderItems"][0]["ItemID"] = self.product1.id
-        data["OrderItems"][0]["Price"] = 100.0
+        data["OrderItems"][0]["PriceWithoutTax"] = 100.0
         data["OrderItems"][0]["Quantity"] = 2
-        data["OrderItems"][0]["DiscountAmount"] = 20.0  # 10% discount on 200
+        data["OrderItems"][0]["DiscountPercentage"] = 10.0  # 10% discount
         data["CheckoutDetails"][0]["AmountPaid"] = 180.0
 
         response = self._make_webhook_request(data)
@@ -978,7 +978,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         result = json.loads(response.content)
         self.assertEqual(result["data"]["successful"], 1)
 
-        # Verify discount was calculated
+        # Verify discount was applied
         pos_order = self.env["pos.order"].browse(result["data"]["results"][0]["pos_order_id"])
         self.assertEqual(pos_order.lines[0].discount, 10.0)
 
@@ -1132,7 +1132,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["OrderStatus"] = 103
         data["OrderDate"] = "2025-11-27T10:00:00"
         data["OrderItems"][0]["ItemID"] = self.product1.id
-        data["OrderItems"][0]["Price"] = -50.0
+        data["OrderItems"][0]["PriceWithoutTax"] = -50.0
         data["CheckoutDetails"][0]["AmountPaid"] = -50.0
 
         response = self._make_webhook_request(data)
@@ -1353,7 +1353,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["AmountPaid"] = "1,000.0"  # With comma
         data["AmountTotal"] = 1000.0
         data["GrandTotal"] = 1000.0
-        data["OrderItems"][0]["Price"] = 1000.0
+        data["OrderItems"][0]["PriceWithoutTax"] = 1000.0
         data["CheckoutDetails"][0]["AmountPaid"] = "1,000.0"
 
         response = self._make_webhook_request(data)
@@ -1518,9 +1518,9 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
                     {
                         "OdooItemID": self.product1.id,
                         "ItemName": self.product1.name,
-                        "Price": 100.0,
+                        "PriceWithoutTax": 100.0,
                         "Quantity": 1,
-                        "DiscountAmount": 0.0,
+                        "DiscountPercentage": 0.0,
                     }
                 ],
                 "CheckoutDetails": [
@@ -1637,7 +1637,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["OrderStatus"] = 103
         data["OrderItems"][0]["OdooItemID"] = self.product1.id
         data["OrderItems"][0]["Quantity"] = 1000
-        data["OrderItems"][0]["Price"] = 1.0
+        data["OrderItems"][0]["PriceWithoutTax"] = 1.0
         data["AmountTotal"] = 1000.0
         data["GrandTotal"] = 1000.0
         data["AmountPaid"] = "1000.0"
@@ -1652,7 +1652,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["OrderID"] = 9100
         data["OrderStatus"] = 103
         data["OrderItems"][0]["OdooItemID"] = self.product1.id
-        data["OrderItems"][0]["Price"] = 99.999999
+        data["OrderItems"][0]["PriceWithoutTax"] = 99.999999
         data["AmountTotal"] = 99.999999
         data["GrandTotal"] = 99.999999
         data["AmountPaid"] = "99.999999"

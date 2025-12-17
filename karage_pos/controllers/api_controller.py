@@ -178,10 +178,10 @@ class APIController(http.Controller):
                     "customer_ref": "CUST-002",  // Optional - Override default customer ref for this order
                     "OrderItems": [
                         {
-                            "ItemID": 35722,
-                            "Price": 18.75,
+                            "OdooItemID": 35722,
+                            "PriceWithoutTax": 18.75,
                             "Quantity": 1,
-                            "DiscountAmount": 0
+                            "DiscountPercentage": 0
                         }
                     ],
                     "CheckoutDetails": [
@@ -452,7 +452,7 @@ class APIController(http.Controller):
             return None
 
         valid_statuses_str = request.env[IR_CONFIG_PARAMETER].sudo().get_param(
-            "karage_pos.valid_order_statuses", "103"
+            "karage_pos.valid_order_statuses", "103,104"
         )
         valid_statuses = [
             int(s.strip()) for s in valid_statuses_str.split(",") if s.strip().isdigit()
@@ -1272,9 +1272,9 @@ class APIController(http.Controller):
             item_name = order_item.get("ItemName", "").strip()
             item_id = order_item.get("ItemID", 0)
             odoo_item_id = order_item.get("OdooItemID", 0)
-            price = float(order_item.get("Price", 0))
+            price = float(order_item.get("PriceWithoutTax", 0))
             quantity = float(order_item.get("Quantity", 1))
-            discount_amount = float(order_item.get("DiscountAmount", 0))
+            discount_percent = float(order_item.get("DiscountPercentage", 0))
 
             # Find product using helper
             product, _ = self._find_product_by_id(
@@ -1292,11 +1292,6 @@ class APIController(http.Controller):
             if validation_error:
                 return None, validation_error
 
-            # Calculate discount percentage
-            discount_percent = 0.0
-            if price > 0 and discount_amount > 0:
-                discount_percent = (discount_amount / (price * quantity)) * 100.0
-
             # Get product taxes, mapped through fiscal position if applicable
             product_taxes = product.taxes_id
             if fiscal_position:
@@ -1306,7 +1301,7 @@ class APIController(http.Controller):
             price_after_discount = price * (1 - discount_percent / 100.0)
 
             # Use Odoo's tax computation to calculate amounts
-            # Prices from webhook are assumed to be tax-inclusive
+            # PriceWithoutTax is tax-excluded, so compute_all adds tax on top
             tax_computation = product_taxes.compute_all(
                 price_after_discount,
                 currency=pos_session.currency_id,

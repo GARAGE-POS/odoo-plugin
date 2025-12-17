@@ -533,9 +533,9 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
             "OdooItemID": self.product1.id,
             "ItemID": 0,
             "ItemName": self.product1.name,
-            "Price": 100.0,
+            "PriceWithoutTax": 100.0,
             "Quantity": 2,
-            "DiscountAmount": 0.0,
+            "DiscountPercentage": 0.0,
         }]
 
         mock_request = self._create_mock_request()
@@ -555,9 +555,9 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
             "OdooItemID": self.product1.id,
             "ItemID": 0,
             "ItemName": self.product1.name,
-            "Price": 100.0,
+            "PriceWithoutTax": 100.0,
             "Quantity": 1,
-            "DiscountAmount": 10.0,
+            "DiscountPercentage": 10.0,
         }]
 
         mock_request = self._create_mock_request()
@@ -575,9 +575,9 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
             "OdooItemID": 99999,
             "ItemID": 99999,
             "ItemName": "NonExistent",
-            "Price": 100.0,
+            "PriceWithoutTax": 100.0,
             "Quantity": 1,
-            "DiscountAmount": 0.0,
+            "DiscountPercentage": 0.0,
         }]
 
         mock_request = self._create_mock_request()
@@ -747,9 +747,9 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -798,9 +798,9 @@ class TestAPIControllerUnit(TransactionCase, KaragePosTestCommon):
                 "OrderItems": [{
                     "OdooItemID": self.product1.id,
                     "ItemName": self.product1.name,
-                    "Price": 100.0,
+                    "PriceWithoutTax": 100.0,
                     "Quantity": 1,
-                    "DiscountAmount": 0.0,
+                    "DiscountPercentage": 0.0,
                 }],
                 "CheckoutDetails": [{
                     "PaymentMode": 1,
@@ -861,9 +861,9 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
                 "OdooItemID": self.product1.id,
                 "ItemID": 0,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -921,9 +921,9 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -960,9 +960,9 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -999,9 +999,9 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 115.0,  # Tax-inclusive price (base 100 + 15 tax)
+                "PriceWithoutTax": 115.0,  # Tax-inclusive price (base 100 + 15 tax)
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -1035,9 +1035,9 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 10.0,
+                "DiscountPercentage": 10.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -1069,9 +1069,9 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -1110,9 +1110,9 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -1144,16 +1144,16 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
                 {
                     "OdooItemID": self.product1.id,
                     "ItemName": self.product1.name,
-                    "Price": 100.0,
+                    "PriceWithoutTax": 100.0,
                     "Quantity": 1,
-                    "DiscountAmount": 0.0,
+                    "DiscountPercentage": 0.0,
                 },
                 {
                     "OdooItemID": self.product2.id,
                     "ItemName": self.product2.name,
-                    "Price": 50.0,
+                    "PriceWithoutTax": 50.0,
                     "Quantity": 1,
-                    "DiscountAmount": 0.0,
+                    "DiscountPercentage": 0.0,
                 },
             ],
             "CheckoutDetails": [{
@@ -1186,9 +1186,9 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -1365,9 +1365,9 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -1496,9 +1496,9 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -1532,9 +1532,9 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
                 "OrderItems": [{
                     "OdooItemID": self.product1.id,
                     "ItemName": self.product1.name,
-                    "Price": 100.0,
+                    "PriceWithoutTax": 100.0,
                     "Quantity": 1,
-                    "DiscountAmount": 0.0,
+                    "DiscountPercentage": 0.0,
                 }],
                 "CheckoutDetails": [{
                     "PaymentMode": 1,
@@ -1607,9 +1607,9 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -1647,9 +1647,9 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -1694,9 +1694,9 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -1729,9 +1729,9 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,
@@ -1885,9 +1885,9 @@ class TestAPIControllerCoverage(TransactionCase, KaragePosTestCommon):
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0.0,
+                "DiscountPercentage": 0.0,
             }],
             "CheckoutDetails": [{
                 "PaymentMode": 1,

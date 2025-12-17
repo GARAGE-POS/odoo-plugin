@@ -155,9 +155,9 @@ class KaragePosTestCommon:
             "OrderItems": [
                 {
                     "ItemID": cls.product1.id,
-                    "Price": 100.0,
+                    "PriceWithoutTax": 100.0,
                     "Quantity": 1,
-                    "DiscountAmount": 0,
+                    "DiscountPercentage": 0,
                 }
             ],
             "CheckoutDetails": [
