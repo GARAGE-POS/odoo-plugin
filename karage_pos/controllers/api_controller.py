@@ -383,12 +383,16 @@ class APIController(http.Controller):
                             "error": order_error.get("message", "Unknown error")
                         })
                     else:
+                        # Calculate tax percent: (tax / untaxed) * 100
+                        amount_untaxed = pos_order.amount_total - pos_order.amount_tax
+                        tax_percent = (pos_order.amount_tax / amount_untaxed * 100) if amount_untaxed else 0.0
                         results.append({
                             "external_order_id": order_id,
                             "status": "success",
                             "pos_order_id": pos_order.id,
                             "pos_order_name": pos_order.name,
                             "amount_total": pos_order.amount_total,
+                            "tax_percent": round(tax_percent, 2),
                         })
 
             except Exception as e:
@@ -1257,8 +1261,12 @@ class APIController(http.Controller):
         """Prepare order lines from order items in Odoo sync_from_ui format.
 
         Returns order lines with all fields needed by Odoo's _process_order method.
+        Uses product taxes from Odoo to calculate tax amounts.
         """
         order_lines = []
+
+        # Get fiscal position from POS config (if any)
+        fiscal_position = pos_session.config_id.default_fiscal_position_id
 
         for order_item in order_items:
             item_name = order_item.get("ItemName", "").strip()
@@ -1289,9 +1297,26 @@ class APIController(http.Controller):
             if price > 0 and discount_amount > 0:
                 discount_percent = (discount_amount / (price * quantity)) * 100.0
 
-            # Calculate line total (webhook prices are assumed to be final/tax-inclusive)
+            # Get product taxes, mapped through fiscal position if applicable
+            product_taxes = product.taxes_id
+            if fiscal_position:
+                product_taxes = fiscal_position.map_tax(product_taxes)
+
+            # Calculate price after discount
             price_after_discount = price * (1 - discount_percent / 100.0)
-            subtotal = price_after_discount * quantity
+
+            # Use Odoo's tax computation to calculate amounts
+            # Prices from webhook are assumed to be tax-inclusive
+            tax_computation = product_taxes.compute_all(
+                price_after_discount,
+                currency=pos_session.currency_id,
+                quantity=quantity,
+                product=product,
+                partner=False,
+            )
+
+            price_subtotal = tax_computation['total_excluded']
+            price_subtotal_incl = tax_computation['total_included']
 
             # Build order line in Odoo sync_from_ui format
             order_lines.append((0, 0, {
@@ -1306,11 +1331,11 @@ class APIController(http.Controller):
                 "qty": quantity,
                 "price_unit": price,
                 "discount": discount_percent,
-                "price_subtotal": subtotal,
-                "price_subtotal_incl": subtotal,
+                "price_subtotal": price_subtotal,
+                "price_subtotal_incl": price_subtotal_incl,
 
-                # Don't assign taxes - webhook provides final amounts
-                "tax_ids": [(6, 0, [])],
+                # Use product taxes
+                "tax_ids": [(6, 0, product_taxes.ids)],
             }))
 
         if not order_lines:
