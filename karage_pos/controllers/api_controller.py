@@ -447,12 +447,17 @@ class APIController(http.Controller):
         return None
 
     def _validate_order_status(self, order_status):
-        """Validate order status against configured valid statuses"""
+        """Validate order status against configured valid statuses
+
+        Default valid statuses:
+        - 103: Regular orders
+        - 106: Refund orders
+        """
         if order_status is None:
             return None
 
         valid_statuses_str = request.env[IR_CONFIG_PARAMETER].sudo().get_param(
-            "karage_pos.valid_order_statuses", "103,104"
+            "karage_pos.valid_order_statuses", "103,106"
         )
         valid_statuses = [
             int(s.strip()) for s in valid_statuses_str.split(",") if s.strip().isdigit()
@@ -540,7 +545,7 @@ class APIController(http.Controller):
             _logger.warning(f"Could not parse OrderDate: {order_date}. Using current time.")
             return fields.Datetime.now()
 
-    def _transform_to_odoo_format(self, webhook_data, pos_session, order_lines, payment_lines, partner=None):
+    def _transform_to_odoo_format(self, webhook_data, pos_session, order_lines, payment_lines, partner=None, external_order_id=None):
         """
         Transform webhook order data to Odoo's sync_from_ui format.
 
@@ -552,8 +557,12 @@ class APIController(http.Controller):
         :param order_lines: Prepared order lines in Odoo format
         :param payment_lines: Prepared payment lines in Odoo format
         :param partner: Optional res.partner record for invoicing
+        :param external_order_id: External order ID (may include :REFUND suffix for refunds)
         :return: Dict in Odoo's sync_from_ui format
         """
+        # Use provided external_order_id or fall back to OrderID from webhook
+        if external_order_id is None:
+            external_order_id = str(webhook_data.get("OrderID", ""))
         config_param = request.env[IR_CONFIG_PARAMETER].sudo()
         external_order_source = config_param.get_param(
             "karage_pos.external_order_source_code", "karage_pos_webhook"
@@ -612,7 +621,7 @@ class APIController(http.Controller):
             'state': 'paid',
 
             # External order tracking fields (handled by overridden _process_order)
-            'external_order_id': str(webhook_data.get("OrderID", "")),
+            'external_order_id': external_order_id,
             'external_order_source': external_order_source,
             'external_order_date': order_datetime,
         }
@@ -754,27 +763,33 @@ class APIController(http.Controller):
                 "karage_pos.external_order_source_code", "karage_pos_webhook"
             )
 
+            # Validate OrderStatus first (needed to determine if this is a refund)
+            order_status = data.get("OrderStatus")
+            status_error = self._validate_order_status(order_status)
+            if status_error:
+                return None, status_error
+
+            # Build external_order_id - append :REFUND suffix for refund orders (status 106)
+            # This allows the same OrderID to be used for both order and refund
+            base_order_id = str(data.get("OrderID", ""))
+            is_refund = order_status == 106
+            external_order_id = f"{base_order_id}:REFUND" if is_refund else base_order_id
+
             # Check for duplicate external order ID
-            external_order_id = str(data.get("OrderID", ""))
             duplicate_error = self._check_duplicate_order(external_order_id, external_order_source)
             if duplicate_error:
                 return None, duplicate_error
 
-            # Validate OrderStatus
-            status_error = self._validate_order_status(data.get("OrderStatus"))
-            if status_error:
-                return None, status_error
-
             # Prepare order lines in Odoo sync_from_ui format
             order_lines, lines_error = self._prepare_order_lines(
-                data.get("OrderItems", []), pos_session
+                data.get("OrderItems", []), pos_session, is_refund=is_refund
             )
             if lines_error:
                 return None, lines_error
 
             # Prepare payment lines in Odoo sync_from_ui format
             payment_lines, payment_error = self._prepare_payment_lines(
-                data.get("CheckoutDetails", []), pos_session
+                data.get("CheckoutDetails", []), pos_session, is_refund=is_refund
             )
             if payment_error:
                 return None, payment_error
@@ -791,7 +806,8 @@ class APIController(http.Controller):
             # Set state to 'draft' so _process_order creates order without
             # triggering picking/invoice creation - we'll handle that manually
             odoo_order_data = self._transform_to_odoo_format(
-                data, pos_session, order_lines, payment_lines, partner=partner
+                data, pos_session, order_lines, payment_lines,
+                partner=partner, external_order_id=external_order_id
             )
             odoo_order_data['state'] = 'draft'  # Create as draft first
 
@@ -1276,11 +1292,15 @@ class APIController(http.Controller):
 
         return None
 
-    def _prepare_order_lines(self, order_items, pos_session):
+    def _prepare_order_lines(self, order_items, pos_session, is_refund=False):
         """Prepare order lines from order items in Odoo sync_from_ui format.
 
         Returns order lines with all fields needed by Odoo's _process_order method.
         Uses product taxes from Odoo to calculate tax amounts.
+
+        :param order_items: List of order items from webhook
+        :param pos_session: POS session record
+        :param is_refund: Whether this is a refund order (status 106) - allows negative quantities
         """
         order_lines = []
 
@@ -1294,6 +1314,13 @@ class APIController(http.Controller):
             price = float(order_item.get("PriceWithoutTax", 0))
             quantity = float(order_item.get("Quantity", 1))
             discount_percent = float(order_item.get("DiscountPercentage", 0))
+
+            # Validate: negative quantities only allowed for refunds (status 106)
+            if quantity < 0 and not is_refund:
+                return None, {
+                    "status": 400,
+                    "message": f"Negative quantity ({quantity}) not allowed for sales orders. Use OrderStatus 106 for refunds."
+                }
 
             # Find product using helper
             product, _ = self._find_product_by_id(
@@ -1415,11 +1442,15 @@ class APIController(http.Controller):
 
         return fallback_payment_mode, fallback_payment_method_id
 
-    def _prepare_payment_lines(self, checkout_details, pos_session):
+    def _prepare_payment_lines(self, checkout_details, pos_session, is_refund=False):
         """Prepare payment lines from checkout details in Odoo sync_from_ui format.
 
         Payment amounts are taken directly from CheckoutDetails.
         Returns payment lines with all fields needed by Odoo's _process_order method.
+
+        :param checkout_details: List of checkout/payment details from webhook
+        :param pos_session: POS session record
+        :param is_refund: Whether this is a refund order (status 106) - allows negative amounts
         """
         payment_lines = []
 
@@ -1431,8 +1462,16 @@ class APIController(http.Controller):
             amount = float(str(checkout.get("AmountPaid", 0)).replace(",", ""))
             card_type = checkout.get("CardType", "Cash")
 
-            if amount <= 0:
+            # Skip zero amounts
+            if amount == 0:
                 continue
+
+            # Validate: negative amounts only allowed for refunds (status 106)
+            if amount < 0 and not is_refund:
+                return None, {
+                    "status": 400,
+                    "message": f"Negative payment amount ({amount}) not allowed for sales orders. Use OrderStatus 106 for refunds."
+                }
 
             # Resolve payment method using multiple strategies
             payment_method = self._resolve_payment_method(
