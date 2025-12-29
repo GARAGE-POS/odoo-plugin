@@ -787,10 +787,10 @@ class TestPosOrderLine(TransactionCase, KaragePosTestCommon):
     def setUpClass(cls):
         super().setUpClass()
         cls.setup_common()
-        # Check if _prepare_base_line_for_taxes_computation exists (Odoo 18+ only)
-        cls.has_taxes_computation = hasattr(
-            cls.env['pos.order.line'], '_prepare_base_line_for_taxes_computation'
-        )
+        # Check Odoo version - method only exists in Odoo 18+
+        from odoo import release
+        cls.odoo_version = int(release.version_info[0])
+        cls.has_taxes_computation = cls.odoo_version >= 18
 
     def test_prepare_base_line_for_taxes_computation_with_external_id(self):
         """Test that external_order_id is used as invoice line name (Odoo 18+)."""
