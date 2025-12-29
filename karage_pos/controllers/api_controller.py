@@ -652,17 +652,20 @@ class APIController(http.Controller):
         total_amount_base = sum(line[2]['price_subtotal'] for line in order_lines)
         total_paid = sum(line[2]['amount'] for line in payment_lines)
 
-        # Build Odoo order data structure
-        # Include both Odoo 17 and Odoo 18+ field names for compatibility
+        # Detect Odoo version by checking field existence
+        # Odoo 17 uses pos_session_id and statement_ids
+        # Odoo 18+ uses session_id and payment_ids
+        pos_order_model = request.env['pos.order'].sudo()
+        is_odoo_17 = 'pos_session_id' in pos_order_model._fields
+
+        # Build Odoo order data structure with version-appropriate fields
         odoo_order = {
             # Core identifiers
             'name': order_name,
             'uuid': order_uuid,
             'access_token': str(uuid4()),
 
-            # Session and config (include both field names for version compatibility)
-            'session_id': pos_session.id,          # Odoo 18+
-            'pos_session_id': pos_session.id,      # Odoo 17
+            # User and pricing
             'user_id': pos_session.user_id.id,
             'pricelist_id': pos_session.config_id.pricelist_id.id,
             'fiscal_position_id': (
@@ -684,10 +687,8 @@ class APIController(http.Controller):
             'amount_tax': total_amount_incl - total_amount_base,
             'amount_total': total_amount_incl,  # Total including tax from order lines
 
-            # Lines and payments (include both field names for version compatibility)
+            # Lines
             'lines': order_lines,
-            'payment_ids': payment_lines,          # Odoo 18+
-            'statement_ids': payment_lines,        # Odoo 17
 
             # State - 'paid' triggers _process_saved_order flow
             'state': 'paid',
@@ -697,6 +698,14 @@ class APIController(http.Controller):
             'external_order_source': external_order_source,
             'external_order_date': order_datetime,
         }
+
+        # Add version-specific session and payment fields
+        if is_odoo_17:
+            odoo_order['pos_session_id'] = pos_session.id
+            odoo_order['statement_ids'] = payment_lines
+        else:
+            odoo_order['session_id'] = pos_session.id
+            odoo_order['payment_ids'] = payment_lines
 
         return odoo_order
 
