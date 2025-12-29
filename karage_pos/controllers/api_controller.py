@@ -3,7 +3,7 @@
 import json
 import logging
 import time
-from random import randint
+import secrets
 from uuid import uuid4
 
 from odoo import fields, http, release
@@ -679,7 +679,7 @@ class APIController(http.Controller):
             'date_order': fields.Datetime.to_string(order_datetime),
             'partner_id': partner.id if partner else False,
             'to_invoice': bool(partner),  # Only invoice if we have a partner
-            'sequence_number': randint(1, 99999),
+            'sequence_number': secrets.randbelow(99999) + 1,
             'last_order_preparation_change': '{}',
 
             # Amounts - calculated from order lines, not payment
@@ -1445,7 +1445,7 @@ class APIController(http.Controller):
             # Build order line in Odoo sync_from_ui format
             order_lines.append((0, 0, {
                 # Required by Odoo's sync_from_ui format
-                "id": randint(1, 1000000),
+                "id": secrets.randbelow(1000000) + 1,
                 "uuid": str(uuid4()),
                 "pack_lot_ids": [],
 
