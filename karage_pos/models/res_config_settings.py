@@ -183,9 +183,9 @@ class ResConfigSettings(models.TransientModel):
     # Order validation configuration
     valid_order_statuses = fields.Char(
         string='Valid Order Statuses',
-        default='103',
+        default='103,104',
         config_parameter='karage_pos.valid_order_statuses',
         help='Comma-separated list of valid OrderStatus values from external POS system. '
              'Only orders with these status codes will be accepted. '
-             'Example: "103,104" to accept multiple statuses. Default: "103" (completed orders).'
+             '103 = completed orders, 104 = refunds. Default: "103,104".'
     )

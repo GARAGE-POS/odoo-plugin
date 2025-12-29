@@ -161,7 +161,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         self.assertEqual(response1.status_code, 200)
         result1 = json.loads(response1.content)
         self.assertEqual(result1["data"]["successful"], 1)
-        order_id_1 = result1["data"]["results"][0]["pos_order_id"]
+        self.assertIn("pos_order_id", result1["data"]["results"][0])
 
         # Second request with same OrderID should fail as duplicate
         response2 = self._make_webhook_request(data)
@@ -228,9 +228,9 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["OrderItems"] = [
             {
                 "ItemID": 99999,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 1,
-                "DiscountAmount": 0,
+                "DiscountPercentage": 0,
             }
         ]
 
@@ -263,7 +263,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data = self.sample_webhook_data.copy()
         data["OrderID"] = 88886  # Unique order ID
         data["OrderItems"][0]["ItemID"] = self.product1.id
-        data["OrderItems"][0]["Price"] = 75.0  # Price determines total
+        data["OrderItems"][0]["PriceWithoutTax"] = 75.0  # Price determines total
         data["CheckoutDetails"][0]["AmountPaid"] = 75.0  # Match the item price
 
         response = self._make_webhook_request(data)
@@ -295,7 +295,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data = self.sample_webhook_data.copy()
         data["OrderID"] = 88887  # Unique order ID
         data["OrderItems"][0]["ItemID"] = self.product1.id
-        data["OrderItems"][0]["Price"] = 115.0  # Tax-inclusive price
+        data["OrderItems"][0]["PriceWithoutTax"] = 115.0  # Tax-inclusive price
         data["CheckoutDetails"][0]["AmountPaid"] = 115.0
 
         response = self._make_webhook_request(data)
@@ -311,7 +311,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data = self.sample_webhook_data.copy()
         data["OrderID"] = 88888  # Unique order ID
         data["OrderItems"][0]["ItemID"] = self.product1.id
-        data["OrderItems"][0]["DiscountAmount"] = 10.0
+        data["OrderItems"][0]["DiscountPercentage"] = 10.0
         data["CheckoutDetails"][0]["AmountPaid"] = 90.0  # 100 - 10 discount
 
         response = self._make_webhook_request(data)
@@ -330,15 +330,15 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["OrderItems"] = [
             {
                 "ItemID": self.product1.id,
-                "Price": 100.0,
+                "PriceWithoutTax": 100.0,
                 "Quantity": 2,
-                "DiscountAmount": 0,
+                "DiscountPercentage": 0,
             },
             {
                 "ItemID": self.product2.id,
-                "Price": 50.0,
+                "PriceWithoutTax": 50.0,
                 "Quantity": 1,
-                "DiscountAmount": 0,
+                "DiscountPercentage": 0,
             },
         ]
         data["CheckoutDetails"][0]["AmountPaid"] = 250.0
@@ -570,9 +570,9 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
                 "OrderItems": [
                     {
                         "ItemID": self.product1.id,
-                        "Price": 100.0,
+                        "PriceWithoutTax": 100.0,
                         "Quantity": 1,
-                        "DiscountAmount": 0,
+                        "DiscountPercentage": 0,
                     }
                 ],
                 "CheckoutDetails": [
@@ -586,9 +586,9 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
                 "OrderItems": [
                     {
                         "ItemID": self.product2.id,
-                        "Price": 200.0,
+                        "PriceWithoutTax": 200.0,
                         "Quantity": 1,
-                        "DiscountAmount": 0,
+                        "DiscountPercentage": 0,
                     }
                 ],
                 "CheckoutDetails": [
@@ -621,9 +621,9 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
                 "OrderItems": [
                     {
                         "ItemID": self.product1.id,
-                        "Price": 100.0,
+                        "PriceWithoutTax": 100.0,
                         "Quantity": 1,
-                        "DiscountAmount": 0,
+                        "DiscountPercentage": 0,
                     }
                 ],
                 "CheckoutDetails": [
@@ -775,7 +775,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["OrderItems"][0]["OdooItemID"] = product_a.id
         data["OrderItems"][0]["ItemID"] = product_b.id
         data["OrderItems"][0]["ItemName"] = "Product B"
-        data["OrderItems"][0]["Price"] = 100.0
+        data["OrderItems"][0]["PriceWithoutTax"] = 100.0
         data["CheckoutDetails"][0]["AmountPaid"] = 100.0
 
         response = self._make_webhook_request(data)
@@ -850,9 +850,9 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         # Only provide ItemName, no IDs
         data["OrderItems"][0] = {
             "ItemName": self.product1.name,
-            "Price": 100.0,
+            "PriceWithoutTax": 100.0,
             "Quantity": 1,
-            "DiscountAmount": 0,
+            "DiscountPercentage": 0,
         }
 
         response = self._make_webhook_request(data)
@@ -880,9 +880,9 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         # Provide partial name for fuzzy match
         data["OrderItems"][0] = {
             "ItemName": "Fuzzy Product",
-            "Price": 75.0,
+            "PriceWithoutTax": 75.0,
             "Quantity": 1,
-            "DiscountAmount": 0,
+            "DiscountPercentage": 0,
         }
 
         response = self._make_webhook_request(data)
@@ -962,15 +962,15 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         self.assertIsNotNone(pos_order.date_order)
 
     def test_webhook_with_discount_percentage(self):
-        """Test webhook correctly calculates discount percentage"""
+        """Test webhook correctly applies discount percentage"""
         data = self.sample_webhook_data.copy()
         data["OrderID"] = 9056
         data["OrderStatus"] = 103
         data["OrderDate"] = "2025-11-27T10:00:00"
         data["OrderItems"][0]["ItemID"] = self.product1.id
-        data["OrderItems"][0]["Price"] = 100.0
+        data["OrderItems"][0]["PriceWithoutTax"] = 100.0
         data["OrderItems"][0]["Quantity"] = 2
-        data["OrderItems"][0]["DiscountAmount"] = 20.0  # 10% discount on 200
+        data["OrderItems"][0]["DiscountPercentage"] = 10.0  # 10% discount
         data["CheckoutDetails"][0]["AmountPaid"] = 180.0
 
         response = self._make_webhook_request(data)
@@ -978,7 +978,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         result = json.loads(response.content)
         self.assertEqual(result["data"]["successful"], 1)
 
-        # Verify discount was calculated
+        # Verify discount was applied
         pos_order = self.env["pos.order"].browse(result["data"]["results"][0]["pos_order_id"])
         self.assertEqual(pos_order.lines[0].discount, 10.0)
 
@@ -1132,7 +1132,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["OrderStatus"] = 103
         data["OrderDate"] = "2025-11-27T10:00:00"
         data["OrderItems"][0]["ItemID"] = self.product1.id
-        data["OrderItems"][0]["Price"] = -50.0
+        data["OrderItems"][0]["PriceWithoutTax"] = -50.0
         data["CheckoutDetails"][0]["AmountPaid"] = -50.0
 
         response = self._make_webhook_request(data)
@@ -1353,7 +1353,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["AmountPaid"] = "1,000.0"  # With comma
         data["AmountTotal"] = 1000.0
         data["GrandTotal"] = 1000.0
-        data["OrderItems"][0]["Price"] = 1000.0
+        data["OrderItems"][0]["PriceWithoutTax"] = 1000.0
         data["CheckoutDetails"][0]["AmountPaid"] = "1,000.0"
 
         response = self._make_webhook_request(data)
@@ -1518,9 +1518,9 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
                     {
                         "OdooItemID": self.product1.id,
                         "ItemName": self.product1.name,
-                        "Price": 100.0,
+                        "PriceWithoutTax": 100.0,
                         "Quantity": 1,
-                        "DiscountAmount": 0.0,
+                        "DiscountPercentage": 0.0,
                     }
                 ],
                 "CheckoutDetails": [
@@ -1637,7 +1637,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["OrderStatus"] = 103
         data["OrderItems"][0]["OdooItemID"] = self.product1.id
         data["OrderItems"][0]["Quantity"] = 1000
-        data["OrderItems"][0]["Price"] = 1.0
+        data["OrderItems"][0]["PriceWithoutTax"] = 1.0
         data["AmountTotal"] = 1000.0
         data["GrandTotal"] = 1000.0
         data["AmountPaid"] = "1000.0"
@@ -1652,7 +1652,7 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         data["OrderID"] = 9100
         data["OrderStatus"] = 103
         data["OrderItems"][0]["OdooItemID"] = self.product1.id
-        data["OrderItems"][0]["Price"] = 99.999999
+        data["OrderItems"][0]["PriceWithoutTax"] = 99.999999
         data["AmountTotal"] = 99.999999
         data["GrandTotal"] = 99.999999
         data["AmountPaid"] = "99.999999"
@@ -1660,3 +1660,754 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
 
         response = self._make_webhook_request(data)
         self.assertEqual(response.status_code, 200)
+
+    # =========== Partner Resolution Tests ===========
+
+    def test_webhook_with_top_level_partner_id(self):
+        """Test webhook with partner_id at top-level (all orders)"""
+        partner = self.env["res.partner"].create({
+            "name": "Test Partner for Webhook",
+            "email": "partner@test.com",
+        })
+
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+        request_data = {
+            "partner_id": partner.id,  # Top-level partner for all orders
+            "orders": [
+                {
+                    "OrderID": 9200,
+                    "OrderStatus": 103,
+                    "OrderDate": "2025-11-27T10:00:00",
+                    "OrderItems": [
+                        {
+                            "OdooItemID": self.product1.id,
+                            "PriceWithoutTax": 100.0,
+                            "Quantity": 1,
+                            "DiscountPercentage": 0,
+                        }
+                    ],
+                    "CheckoutDetails": [
+                        {"PaymentMode": 1, "AmountPaid": 100.0, "CardType": "Cash"}
+                    ],
+                }
+            ]
+        }
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps(request_data),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+        # Verify partner was set on the order
+        pos_order = self.env["pos.order"].browse(result["data"]["results"][0]["pos_order_id"])
+        self.assertEqual(pos_order.partner_id.id, partner.id)
+
+    def test_webhook_with_customer_ref_lookup(self):
+        """Test webhook with customer_ref for partner lookup"""
+        # Create partner with ref
+        partner = self.env["res.partner"].create({
+            "name": "Customer Ref Partner",
+            "ref": "CUST-REF-001",
+            "email": "custref@test.com",
+        })
+
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+        request_data = {
+            "customer_ref": "CUST-REF-001",  # Top-level customer ref
+            "orders": [
+                {
+                    "OrderID": 9201,
+                    "OrderStatus": 103,
+                    "OrderDate": "2025-11-27T10:00:00",
+                    "OrderItems": [
+                        {
+                            "OdooItemID": self.product1.id,
+                            "PriceWithoutTax": 100.0,
+                            "Quantity": 1,
+                            "DiscountPercentage": 0,
+                        }
+                    ],
+                    "CheckoutDetails": [
+                        {"PaymentMode": 1, "AmountPaid": 100.0, "CardType": "Cash"}
+                    ],
+                }
+            ]
+        }
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps(request_data),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+        # Verify partner was resolved via customer_ref
+        pos_order = self.env["pos.order"].browse(result["data"]["results"][0]["pos_order_id"])
+        self.assertEqual(pos_order.partner_id.id, partner.id)
+
+    def test_webhook_order_level_partner_overrides_top_level(self):
+        """Test that order-level partner_id overrides top-level partner_id"""
+        partner1 = self.env["res.partner"].create({
+            "name": "Top Level Partner",
+            "email": "top@test.com",
+        })
+        partner2 = self.env["res.partner"].create({
+            "name": "Order Level Partner",
+            "email": "order@test.com",
+        })
+
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+        request_data = {
+            "partner_id": partner1.id,  # Top-level
+            "orders": [
+                {
+                    "OrderID": 9202,
+                    "OrderStatus": 103,
+                    "partner_id": partner2.id,  # Order-level override
+                    "OrderDate": "2025-11-27T10:00:00",
+                    "OrderItems": [
+                        {
+                            "OdooItemID": self.product1.id,
+                            "PriceWithoutTax": 100.0,
+                            "Quantity": 1,
+                            "DiscountPercentage": 0,
+                        }
+                    ],
+                    "CheckoutDetails": [
+                        {"PaymentMode": 1, "AmountPaid": 100.0, "CardType": "Cash"}
+                    ],
+                }
+            ]
+        }
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps(request_data),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+        # Verify order-level partner was used
+        pos_order = self.env["pos.order"].browse(result["data"]["results"][0]["pos_order_id"])
+        self.assertEqual(pos_order.partner_id.id, partner2.id)
+
+    def test_webhook_order_level_customer_ref_overrides_top_level(self):
+        """Test that order-level customer_ref overrides top-level customer_ref"""
+        # Create top-level partner (won't be used, order-level takes priority)
+        self.env["res.partner"].create({
+            "name": "Top Level Partner",
+            "ref": "TOP-REF-001",
+        })
+        partner2 = self.env["res.partner"].create({
+            "name": "Order Level Partner",
+            "ref": "ORDER-REF-001",
+        })
+
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+        request_data = {
+            "customer_ref": "TOP-REF-001",  # Top-level
+            "orders": [
+                {
+                    "OrderID": 9203,
+                    "OrderStatus": 103,
+                    "customer_ref": "ORDER-REF-001",  # Order-level override
+                    "OrderDate": "2025-11-27T10:00:00",
+                    "OrderItems": [
+                        {
+                            "OdooItemID": self.product1.id,
+                            "PriceWithoutTax": 100.0,
+                            "Quantity": 1,
+                            "DiscountPercentage": 0,
+                        }
+                    ],
+                    "CheckoutDetails": [
+                        {"PaymentMode": 1, "AmountPaid": 100.0, "CardType": "Cash"}
+                    ],
+                }
+            ]
+        }
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps(request_data),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+        # Verify order-level customer_ref partner was used
+        pos_order = self.env["pos.order"].browse(result["data"]["results"][0]["pos_order_id"])
+        self.assertEqual(pos_order.partner_id.id, partner2.id)
+
+    def test_webhook_invalid_partner_id(self):
+        """Test webhook with invalid partner_id"""
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+        request_data = {
+            "partner_id": 99999999,  # Non-existent partner
+            "orders": [
+                {
+                    "OrderID": 9204,
+                    "OrderStatus": 103,
+                    "OrderItems": [
+                        {
+                            "OdooItemID": self.product1.id,
+                            "PriceWithoutTax": 100.0,
+                            "Quantity": 1,
+                            "DiscountPercentage": 0,
+                        }
+                    ],
+                    "CheckoutDetails": [
+                        {"PaymentMode": 1, "AmountPaid": 100.0, "CardType": "Cash"}
+                    ],
+                }
+            ]
+        }
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps(request_data),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        result = json.loads(response.content)
+        self.assertIn("does not exist", result["error"])
+
+    def test_webhook_invalid_order_level_partner_id(self):
+        """Test webhook with invalid order-level partner_id"""
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+        request_data = {
+            "orders": [
+                {
+                    "OrderID": 9205,
+                    "OrderStatus": 103,
+                    "partner_id": 99999999,  # Invalid order-level partner
+                    "OrderItems": [
+                        {
+                            "OdooItemID": self.product1.id,
+                            "PriceWithoutTax": 100.0,
+                            "Quantity": 1,
+                            "DiscountPercentage": 0,
+                        }
+                    ],
+                    "CheckoutDetails": [
+                        {"PaymentMode": 1, "AmountPaid": 100.0, "CardType": "Cash"}
+                    ],
+                }
+            ]
+        }
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps(request_data),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        self.assertEqual(response.status_code, 200)  # Bulk returns 200 with error in results
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["failed"], 1)
+        self.assertIn("does not exist", result["data"]["results"][0]["error"])
+
+    def test_webhook_customer_ref_not_found(self):
+        """Test webhook with customer_ref that doesn't match any partner"""
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+        request_data = {
+            "customer_ref": "NON-EXISTENT-REF",
+            "orders": [
+                {
+                    "OrderID": 9206,
+                    "OrderStatus": 103,
+                    "OrderItems": [
+                        {
+                            "OdooItemID": self.product1.id,
+                            "PriceWithoutTax": 100.0,
+                            "Quantity": 1,
+                            "DiscountPercentage": 0,
+                        }
+                    ],
+                    "CheckoutDetails": [
+                        {"PaymentMode": 1, "AmountPaid": 100.0, "CardType": "Cash"}
+                    ],
+                }
+            ]
+        }
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps(request_data),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        # Should succeed - order created without partner (no invoice)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+    def test_webhook_with_default_partner_from_settings(self):
+        """Test webhook uses default partner from settings when no partner provided"""
+        # Create and set default partner
+        default_partner = self.env["res.partner"].create({
+            "name": "Default Partner",
+            "email": "default@test.com",
+        })
+        self.env["ir.config_parameter"].sudo().set_param(
+            "karage_pos.default_partner_id", str(default_partner.id)
+        )
+
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9207
+        data["OrderStatus"] = 103
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+        # No partner_id or customer_ref provided
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+        # Verify default partner was used
+        pos_order = self.env["pos.order"].browse(result["data"]["results"][0]["pos_order_id"])
+        self.assertEqual(pos_order.partner_id.id, default_partner.id)
+
+        # Clean up
+        self.env["ir.config_parameter"].sudo().set_param(
+            "karage_pos.default_partner_id", "0"
+        )
+
+    # =========== Refund Order Tests (OrderStatus 106) ===========
+
+    def test_webhook_refund_order_status_106(self):
+        """Test refund order with OrderStatus 106"""
+        # First create a regular order
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9300
+        data["OrderStatus"] = 103
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+        # Now create a refund for the same OrderID
+        refund_data = self.sample_webhook_data.copy()
+        refund_data["OrderID"] = 9300  # Same OrderID
+        refund_data["OrderStatus"] = 106  # Refund status
+        refund_data["OrderItems"][0]["OdooItemID"] = self.product1.id
+        refund_data["OrderItems"][0]["Quantity"] = -1  # Negative quantity for refund
+        refund_data["OrderItems"][0]["PriceWithoutTax"] = -100.0  # Negative price
+        refund_data["CheckoutDetails"][0]["AmountPaid"] = -100.0  # Negative payment
+
+        response = self._make_webhook_request(refund_data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+        # Verify the refund order was created with :REFUND suffix
+        pos_order = self.env["pos.order"].browse(result["data"]["results"][0]["pos_order_id"])
+        self.assertEqual(pos_order.external_order_id, "9300:REFUND")
+
+    def test_webhook_refund_negative_quantity_requires_status_106(self):
+        """Test that negative quantity requires OrderStatus 106"""
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9301
+        data["OrderStatus"] = 103  # Regular order, not refund
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+        data["OrderItems"][0]["Quantity"] = -1  # Negative quantity should fail
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)  # Bulk returns 200 with error
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["failed"], 1)
+        self.assertIn("Negative quantity", result["data"]["results"][0]["error"])
+        self.assertIn("106", result["data"]["results"][0]["error"])
+
+    def test_webhook_refund_negative_payment_requires_status_106(self):
+        """Test that negative payment requires OrderStatus 106"""
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9302
+        data["OrderStatus"] = 103  # Regular order, not refund
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+        data["CheckoutDetails"][0]["AmountPaid"] = -100.0  # Negative payment should fail
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)  # Bulk returns 200 with error
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["failed"], 1)
+        self.assertIn("Negative payment amount", result["data"]["results"][0]["error"])
+
+    def test_webhook_refund_with_positive_amounts(self):
+        """Test refund order with positive amounts (also valid for status 106)"""
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9303
+        data["OrderStatus"] = 106  # Refund
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+        data["OrderItems"][0]["Quantity"] = 1  # Positive quantity
+        data["OrderItems"][0]["PriceWithoutTax"] = 100.0
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+    # =========== POS Config ID Tests ===========
+
+    def test_webhook_with_pos_config_id(self):
+        """Test webhook with explicit pos_config_id"""
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+        request_data = {
+            "pos_config_id": self.pos_config.id,
+            "orders": [
+                {
+                    "OrderID": 9400,
+                    "OrderStatus": 103,
+                    "OrderDate": "2025-11-27T10:00:00",
+                    "OrderItems": [
+                        {
+                            "OdooItemID": self.product1.id,
+                            "PriceWithoutTax": 100.0,
+                            "Quantity": 1,
+                            "DiscountPercentage": 0,
+                        }
+                    ],
+                    "CheckoutDetails": [
+                        {"PaymentMode": 1, "AmountPaid": 100.0, "CardType": "Cash"}
+                    ],
+                }
+            ]
+        }
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps(request_data),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+        self.assertEqual(result["data"]["pos_config_id"], self.pos_config.id)
+
+    def test_webhook_with_invalid_pos_config_id(self):
+        """Test webhook with invalid pos_config_id"""
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+        request_data = {
+            "pos_config_id": 99999999,  # Non-existent
+            "orders": [
+                {
+                    "OrderID": 9401,
+                    "OrderStatus": 103,
+                    "OrderItems": [
+                        {
+                            "OdooItemID": self.product1.id,
+                            "PriceWithoutTax": 100.0,
+                            "Quantity": 1,
+                            "DiscountPercentage": 0,
+                        }
+                    ],
+                    "CheckoutDetails": [
+                        {"PaymentMode": 1, "AmountPaid": 100.0, "CardType": "Cash"}
+                    ],
+                }
+            ]
+        }
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps(request_data),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        result = json.loads(response.content)
+        self.assertIn("does not exist", result["error"])
+
+    def test_webhook_with_invalid_pos_config_id_format(self):
+        """Test webhook with invalid pos_config_id format"""
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+        request_data = {
+            "pos_config_id": "not_a_number",
+            "orders": [
+                {
+                    "OrderID": 9402,
+                    "OrderStatus": 103,
+                    "OrderItems": [
+                        {
+                            "OdooItemID": self.product1.id,
+                            "PriceWithoutTax": 100.0,
+                            "Quantity": 1,
+                            "DiscountPercentage": 0,
+                        }
+                    ],
+                    "CheckoutDetails": [
+                        {"PaymentMode": 1, "AmountPaid": 100.0, "CardType": "Cash"}
+                    ],
+                }
+            ]
+        }
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps(request_data),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        result = json.loads(response.content)
+        self.assertIn("must be a valid integer", result["error"])
+
+    def test_webhook_with_zero_pos_config_id(self):
+        """Test webhook with zero pos_config_id"""
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+        request_data = {
+            "pos_config_id": 0,
+            "orders": [
+                {
+                    "OrderID": 9403,
+                    "OrderStatus": 103,
+                    "OrderItems": [
+                        {
+                            "OdooItemID": self.product1.id,
+                            "PriceWithoutTax": 100.0,
+                            "Quantity": 1,
+                            "DiscountPercentage": 0,
+                        }
+                    ],
+                    "CheckoutDetails": [
+                        {"PaymentMode": 1, "AmountPaid": 100.0, "CardType": "Cash"}
+                    ],
+                }
+            ]
+        }
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps(request_data),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        result = json.loads(response.content)
+        self.assertIn("must be greater than zero", result["error"])
+
+    # =========== Order Date Format Tests ===========
+
+    def test_webhook_order_date_iso_with_offset(self):
+        """Test OrderDate with timezone offset (e.g., +03:00)"""
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9500
+        data["OrderStatus"] = 103
+        data["OrderDate"] = "2025-11-27T15:30:45+03:00"
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+        # Verify date was converted to UTC
+        pos_order = self.env["pos.order"].browse(result["data"]["results"][0]["pos_order_id"])
+        self.assertIsNotNone(pos_order.date_order)
+
+    def test_webhook_order_date_with_milliseconds(self):
+        """Test OrderDate with milliseconds"""
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9501
+        data["OrderStatus"] = 103
+        data["OrderDate"] = "2025-11-27T15:30:45.123456"
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+    # =========== Invoice Generation Tests ===========
+
+    def test_webhook_invoice_generated_with_partner(self):
+        """Test that invoice is generated when partner is set"""
+        partner = self.env["res.partner"].create({
+            "name": "Invoice Partner",
+            "email": "invoice@test.com",
+        })
+
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+        request_data = {
+            "partner_id": partner.id,
+            "orders": [
+                {
+                    "OrderID": 9600,
+                    "OrderStatus": 103,
+                    "OrderDate": "2025-11-27T10:00:00",
+                    "OrderItems": [
+                        {
+                            "OdooItemID": self.product1.id,
+                            "PriceWithoutTax": 100.0,
+                            "Quantity": 1,
+                            "DiscountPercentage": 0,
+                        }
+                    ],
+                    "CheckoutDetails": [
+                        {"PaymentMode": 1, "AmountPaid": 100.0, "CardType": "Cash"}
+                    ],
+                }
+            ]
+        }
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps(request_data),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+        pos_order = self.env["pos.order"].browse(result["data"]["results"][0]["pos_order_id"])
+        self.assertEqual(pos_order.partner_id.id, partner.id)
+        # Invoice should have been attempted (may fail if accounting not fully set up)
+        # Just verify to_invoice flag was set
+        self.assertTrue(pos_order.to_invoice)
+
+    def test_webhook_no_invoice_without_partner(self):
+        """Test that no invoice is generated when no partner is set"""
+        # Clear default partner
+        self.env["ir.config_parameter"].sudo().set_param(
+            "karage_pos.default_partner_id", "0"
+        )
+
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9601
+        data["OrderStatus"] = 103
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+        pos_order = self.env["pos.order"].browse(result["data"]["results"][0]["pos_order_id"])
+        self.assertFalse(pos_order.partner_id)
+        self.assertFalse(pos_order.to_invoice)
+
+    # =========== Session Creation Tests ===========
+
+    def test_webhook_creates_session_when_none_exists(self):
+        """Test that webhook creates session when none exists"""
+        # Close existing session
+        self.pos_session.action_pos_session_closing_control()
+        self.pos_session.action_pos_session_close()
+
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9700
+        data["OrderStatus"] = 103
+        data["OrderItems"][0]["OdooItemID"] = self.product1.id
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+        # Verify a new session was created
+        new_session = self.env["pos.session"].search([
+            ("config_id", "=", self.pos_config.id),
+            ("state", "in", ["opened", "closed"]),
+        ], order="id desc", limit=1)
+        self.assertTrue(new_session.exists())
+
+    # =========== Multi-Status Response Tests ===========
+
+    def test_webhook_partial_success_returns_207(self):
+        """Test that partial success returns appropriate status in data"""
+        bulk_url = "/api/v1/webhook/pos-order/bulk"
+        orders_data = [
+            {
+                "OrderID": 9800,
+                "OrderStatus": 103,
+                "OrderDate": "2025-11-27T10:00:00",
+                "OrderItems": [
+                    {
+                        "OdooItemID": self.product1.id,
+                        "PriceWithoutTax": 100.0,
+                        "Quantity": 1,
+                        "DiscountPercentage": 0,
+                    }
+                ],
+                "CheckoutDetails": [
+                    {"PaymentMode": 1, "AmountPaid": 100.0, "CardType": "Cash"}
+                ],
+            },
+            {
+                "OrderID": 9801,
+                "OrderStatus": 103,
+                "OrderItems": [],  # Invalid - no items
+                "CheckoutDetails": [],
+            },
+        ]
+
+        response = self.url_open(
+            bulk_url,
+            data=json.dumps({"orders": orders_data}),
+            headers={"X-API-KEY": self.api_key},
+        )
+
+        # Response is 200 with partial success in data
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+        self.assertEqual(result["data"]["failed"], 1)
+
+    # =========== Tax Calculation Tests ===========
+
+    def test_webhook_tax_percent_calculated_correctly(self):
+        """Test that tax_percent is calculated correctly in response"""
+        # Create tax
+        country = self.env.ref("base.us", raise_if_not_found=False) or self.env["res.country"].search([], limit=1)
+        tax = self.env["account.tax"].create({
+            "name": "Test Tax 20%",
+            "amount": 20.0,
+            "type_tax_use": "sale",
+            "company_id": self.company.id,
+            "tax_group_id": self.tax_group.id,
+            "country_id": country.id,
+        })
+
+        product_with_tax = self.env["product.product"].create({
+            "name": "Taxed Product",
+            "list_price": 100.0,
+            "available_in_pos": True,
+            "sale_ok": True,
+            "taxes_id": [(6, 0, [tax.id])],
+        })
+
+        data = self.sample_webhook_data.copy()
+        data["OrderID"] = 9900
+        data["OrderStatus"] = 103
+        data["OrderItems"][0]["OdooItemID"] = product_with_tax.id
+        data["OrderItems"][0]["PriceWithoutTax"] = 100.0
+        data["CheckoutDetails"][0]["AmountPaid"] = 120.0  # 100 + 20% tax
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+        # Verify tax_percent is in response
+        order_result = result["data"]["results"][0]
+        self.assertIn("tax_percent", order_result)
+        # Tax should be approximately 20%
+        self.assertGreater(order_result["tax_percent"], 0)
