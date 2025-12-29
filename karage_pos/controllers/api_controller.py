@@ -6,10 +6,16 @@ import time
 from random import randint
 from uuid import uuid4
 
-from odoo import fields, http
+from odoo import fields, http, release
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
+
+# Detect Odoo version once at module load
+# Odoo 17 uses pos_session_id and statement_ids in order dicts
+# Odoo 18+ uses session_id and payment_ids
+ODOO_VERSION = int(release.version_info[0])
+IS_ODOO_17 = ODOO_VERSION == 17
 
 # Constants
 IR_CONFIG_PARAMETER = "ir.config_parameter"
@@ -652,13 +658,8 @@ class APIController(http.Controller):
         total_amount_base = sum(line[2]['price_subtotal'] for line in order_lines)
         total_paid = sum(line[2]['amount'] for line in payment_lines)
 
-        # Detect Odoo version by checking field existence
-        # Odoo 17 uses pos_session_id and statement_ids
-        # Odoo 18+ uses session_id and payment_ids
-        pos_order_model = request.env['pos.order'].sudo()
-        is_odoo_17 = 'pos_session_id' in pos_order_model._fields
-
         # Build Odoo order data structure with version-appropriate fields
+        # Uses global IS_ODOO_17 constant for reliable version detection
         odoo_order = {
             # Core identifiers
             'name': order_name,
@@ -700,7 +701,7 @@ class APIController(http.Controller):
         }
 
         # Add version-specific session and payment fields
-        if is_odoo_17:
+        if IS_ODOO_17:
             odoo_order['pos_session_id'] = pos_session.id
             odoo_order['statement_ids'] = payment_lines
         else:
@@ -892,9 +893,10 @@ class APIController(http.Controller):
             )
             odoo_order_data['state'] = 'draft'  # Create as draft first
 
+            session_key = 'pos_session_id' if IS_ODOO_17 else 'session_id'
             _logger.info(
-                f"Transformed order data: state={odoo_order_data.get('state')}, "
-                f"session_id={odoo_order_data.get('session_id')}, "
+                f"Transformed order data (Odoo {ODOO_VERSION}): state={odoo_order_data.get('state')}, "
+                f"{session_key}={odoo_order_data.get(session_key)}, "
                 f"to_invoice={odoo_order_data.get('to_invoice')}"
             )
 
@@ -904,7 +906,7 @@ class APIController(http.Controller):
             try:
                 # Try Odoo 18+ signature first (2 arguments)
                 # Odoo 18+: _process_order(order, existing_order)
-                _logger.info("Attempting Odoo 18+ _process_order signature (2 args)")
+                _logger.info(f"Attempting Odoo {ODOO_VERSION} _process_order")
                 order_id = pos_order_model._process_order(odoo_order_data, False)
                 _logger.info(f"Odoo 18+ signature succeeded, order_id={order_id}")
             except TypeError as e:
