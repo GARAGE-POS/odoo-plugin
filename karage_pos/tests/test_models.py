@@ -716,6 +716,147 @@ class TestPosOrder(TransactionCase, KaragePosTestCommon):
         result = pos_order._should_create_picking_real_time()
         self.assertIsInstance(result, bool)
 
+    def test_action_pos_order_paid_external_order(self):
+        """Test that external orders can be marked as paid with partial payment."""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 50.0,  # Partial payment
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "external_order_id": "PARTIAL-PAY-123",
+            "external_order_source": "karage_pos_webhook",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 50.0,
+            })],
+        })
+
+        # External orders should accept partial payments
+        result = pos_order.action_pos_order_paid()
+        self.assertTrue(result)
+        self.assertEqual(pos_order.state, "paid")
+
+    def test_action_pos_order_paid_non_external_order(self):
+        """Test that non-external orders use standard payment validation."""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,  # Full payment
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # Non-external orders should use standard validation
+        self.assertFalse(pos_order.external_order_source)
+        # Should succeed with full payment
+        result = pos_order.action_pos_order_paid()
+        self.assertTrue(result)
+        self.assertEqual(pos_order.state, "paid")
+
+
+@tagged("post_install", "-at_install")
+class TestPosOrderLine(TransactionCase, KaragePosTestCommon):
+    """Test POS order line model extensions"""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.setup_common()
+
+    def test_prepare_base_line_for_taxes_computation_with_external_id(self):
+        """Test that external_order_id is used as invoice line name."""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "external_order_id": "EXT-LINE-TEST-123",
+            "external_order_source": "karage_pos_webhook",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # Get the order line
+        order_line = pos_order.lines[0]
+
+        # Call the method and check the result
+        values = order_line._prepare_base_line_for_taxes_computation()
+
+        # Should use external_order_id as the name
+        self.assertEqual(values.get('name'), "EXT-LINE-TEST-123")
+
+    def test_prepare_base_line_for_taxes_computation_without_external_id(self):
+        """Test that standard name is used when no external_order_id."""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # Get the order line
+        order_line = pos_order.lines[0]
+
+        # Call the method and check the result
+        values = order_line._prepare_base_line_for_taxes_computation()
+
+        # Should not override name (or name should be standard product name)
+        # The name should NOT be an external order ID
+        self.assertNotEqual(values.get('name'), "EXT-LINE-TEST-123")
+
 
 @tagged("post_install", "-at_install")
 class TestResConfigSettings(TransactionCase, KaragePosTestCommon):
