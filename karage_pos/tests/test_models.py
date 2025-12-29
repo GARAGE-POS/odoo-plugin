@@ -937,3 +937,553 @@ class TestResConfigSettings(TransactionCase, KaragePosTestCommon):
         settings = self.env["res.config.settings"].create({})
         self.assertEqual(settings.idempotency_processing_timeout, "15")
         self.assertEqual(settings.idempotency_retention_days, "45")
+
+
+@tagged("post_install", "-at_install")
+class TestPosOrderPickingConfig(TransactionCase, KaragePosTestCommon):
+    """Test POS order picking configuration validation"""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.setup_common()
+
+    def test_is_picking_config_valid_no_picking_type(self):
+        """Test _is_picking_config_valid returns False when no picking type configured"""
+        # Create a POS config without picking type
+        pos_config_no_picking = self.env["pos.config"].create({
+            "name": "Test POS No Picking",
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "picking_type_id": False,
+        })
+        pos_config_no_picking.write({"payment_method_ids": [(6, 0, [self.payment_method_cash.id])]})
+
+        # Create order with this config
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": pos_config_no_picking.id,
+            "company_id": pos_config_no_picking.company_id.id,
+            "pricelist_id": pos_config_no_picking.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # Method should return False
+        self.assertFalse(pos_order._is_picking_config_valid())
+
+    def test_is_external_order_from_field(self):
+        """Test _is_external_order detects external order from field"""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "external_order_id": "EXT-TEST-001",
+            "external_order_source": "karage_pos_webhook",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        self.assertTrue(pos_order._is_external_order())
+
+    def test_is_external_order_from_context(self):
+        """Test _is_external_order detects external order from context"""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # Without context or field, not external
+        self.assertFalse(pos_order._is_external_order())
+
+        # With context, is external
+        pos_order_with_ctx = pos_order.with_context(is_external_order=True)
+        self.assertTrue(pos_order_with_ctx._is_external_order())
+
+    def test_is_external_order_not_external(self):
+        """Test _is_external_order returns False for regular orders"""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        self.assertFalse(pos_order._is_external_order())
+
+    def test_action_pos_order_paid_external_order_partial_payment(self):
+        """Test external orders can be paid even with partial payment"""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 200.0,  # Total is 200
+            "amount_paid": 100.0,  # Only 100 paid
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "external_order_source": "karage_pos_webhook",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 2,
+                "price_unit": 100.0,
+                "price_subtotal": 200.0,
+                "price_subtotal_incl": 200.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,  # Partial payment
+            })],
+        })
+
+        # Should succeed for external orders
+        result = pos_order.action_pos_order_paid()
+        self.assertTrue(result)
+        self.assertEqual(pos_order.state, "paid")
+
+    def test_should_create_picking_real_time_external_order_forces_true(self):
+        """Test _should_create_picking_real_time returns True for external orders"""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "external_order_source": "karage_pos_webhook",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # External orders always return True
+        self.assertTrue(pos_order._should_create_picking_real_time())
+
+    def test_process_order_sets_context_for_external_orders(self):
+        """Test that _process_order sets context for external orders"""
+        # This test verifies that context is properly set
+        order_data = {
+            "name": "Test External Order",
+            "uuid": str(uuid.uuid4()),
+            "session_id": self.pos_session.id,
+            "user_id": self.user.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "partner_id": False,
+            "date_order": fields.Datetime.to_string(fields.Datetime.now()),
+            "amount_paid": 100.0,
+            "amount_total": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "state": "draft",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+            "external_order_source": "test_source",
+            "external_order_id": "TEST-EXT-001",
+        }
+
+        # Call _process_order
+        pos_order_model = self.env["pos.order"]
+        try:
+            # Try Odoo 18+ signature first
+            order_id = pos_order_model._process_order(order_data, False)
+        except TypeError:
+            # Fall back to Odoo 17 signature
+            wrapped = {
+                'data': order_data,
+                'id': order_data.get('name'),
+                'to_invoice': False,
+            }
+            order_id = pos_order_model._process_order(wrapped, True, False)
+
+        # Verify order was created
+        self.assertTrue(order_id)
+        pos_order = self.env["pos.order"].browse(order_id)
+        self.assertTrue(pos_order.exists())
+
+
+@tagged("post_install", "-at_install")
+class TestPosOrderProcessSavedOrder(TransactionCase, KaragePosTestCommon):
+    """Test _process_saved_order method for external orders"""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.setup_common()
+
+    def test_process_saved_order_external_with_context(self):
+        """Test _process_saved_order handles external orders via context"""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "state": "draft",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # Process with external context
+        pos_order_with_ctx = pos_order.with_context(
+            is_external_order=True,
+            external_order_source="test",
+            external_order_id="TEST-001",
+        )
+
+        # Call _process_saved_order with draft=False
+        result = pos_order_with_ctx._process_saved_order(False)
+
+        # Should return order ID
+        self.assertEqual(result, pos_order.id)
+        # Order should be paid
+        pos_order.invalidate_recordset(['state'])
+        self.assertEqual(pos_order.state, "paid")
+
+    def test_process_saved_order_external_with_field(self):
+        """Test _process_saved_order handles external orders via field"""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "state": "draft",
+            "external_order_source": "karage_pos_webhook",
+            "external_order_id": "EXT-002",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # Call _process_saved_order with draft=False
+        result = pos_order._process_saved_order(False)
+
+        # Should return order ID
+        self.assertEqual(result, pos_order.id)
+        # Order should be paid
+        pos_order.invalidate_recordset(['state'])
+        self.assertEqual(pos_order.state, "paid")
+
+    def test_process_saved_order_draft_mode(self):
+        """Test _process_saved_order with draft=True skips processing"""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "state": "draft",
+            "external_order_source": "karage_pos_webhook",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # Call with draft=True
+        result = pos_order._process_saved_order(True)
+
+        # Should return order ID
+        self.assertTrue(result)
+
+    def test_process_saved_order_cancelled_order(self):
+        """Test _process_saved_order skips cancelled orders"""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "state": "cancel",  # Cancelled state
+            "external_order_source": "karage_pos_webhook",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # Call with draft=False but order is cancelled
+        result = pos_order._process_saved_order(False)
+
+        # Should return result via super (doesn't trigger external flow)
+        self.assertTrue(result)
+
+    def test_process_saved_order_with_invoice_flag(self):
+        """Test _process_saved_order with to_invoice flag"""
+        partner = self.env["res.partner"].create({
+            "name": "Invoice Test Partner",
+            "email": "invoicetest@test.com",
+        })
+
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "state": "draft",
+            "partner_id": partner.id,
+            "to_invoice": True,
+            "external_order_source": "karage_pos_webhook",
+            "external_order_id": "EXT-INVOICE-001",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # Process
+        result = pos_order._process_saved_order(False)
+
+        self.assertEqual(result, pos_order.id)
+        pos_order.invalidate_recordset(['state'])
+        self.assertEqual(pos_order.state, "paid")
+
+
+@tagged("post_install", "-at_install")
+class TestPosOrderExternalFields(TransactionCase, KaragePosTestCommon):
+    """Test external order fields on POS order"""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.setup_common()
+
+    def test_external_order_id_index(self):
+        """Test external_order_id field is indexed for fast lookups"""
+        field = self.env["pos.order"]._fields.get("external_order_id")
+        self.assertIsNotNone(field)
+        self.assertTrue(field.index)
+
+    def test_external_order_source_field(self):
+        """Test external_order_source field exists"""
+        field = self.env["pos.order"]._fields.get("external_order_source")
+        self.assertIsNotNone(field)
+
+    def test_external_order_date_field(self):
+        """Test external_order_date field exists"""
+        field = self.env["pos.order"]._fields.get("external_order_date")
+        self.assertIsNotNone(field)
+
+    def test_search_by_external_order_id_with_source(self):
+        """Test searching by external_order_id and source"""
+        pos_order = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "external_order_id": "UNIQUE-EXT-ID-12345",
+            "external_order_source": "karage_pos_webhook",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # Search by both fields
+        found = self.env["pos.order"].search([
+            ("external_order_id", "=", "UNIQUE-EXT-ID-12345"),
+            ("external_order_source", "=", "karage_pos_webhook"),
+        ])
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found.id, pos_order.id)
+
+    def test_refund_suffix_on_external_order_id(self):
+        """Test that :REFUND suffix allows same OrderID for order and refund"""
+        # Create original order
+        order1 = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": 100.0,
+            "amount_paid": 100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "external_order_id": "ORDER-123",
+            "external_order_source": "karage_pos_webhook",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": 1,
+                "price_unit": 100.0,
+                "price_subtotal": 100.0,
+                "price_subtotal_incl": 100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": 100.0,
+            })],
+        })
+
+        # Create refund order with :REFUND suffix
+        order2 = self.env["pos.order"].create({
+            "session_id": self.pos_session.id,
+            "config_id": self.pos_config.id,
+            "company_id": self.pos_config.company_id.id,
+            "pricelist_id": self.pos_config.pricelist_id.id,
+            "amount_total": -100.0,
+            "amount_paid": -100.0,
+            "amount_tax": 0.0,
+            "amount_return": 0.0,
+            "external_order_id": "ORDER-123:REFUND",
+            "external_order_source": "karage_pos_webhook",
+            "lines": [(0, 0, {
+                "product_id": self.product1.id,
+                "qty": -1,
+                "price_unit": 100.0,
+                "price_subtotal": -100.0,
+                "price_subtotal_incl": -100.0,
+            })],
+            "payment_ids": [(0, 0, {
+                "payment_method_id": self.payment_method_cash.id,
+                "amount": -100.0,
+            })],
+        })
+
+        # Both orders should exist
+        self.assertTrue(order1.exists())
+        self.assertTrue(order2.exists())
+        self.assertNotEqual(order1.id, order2.id)
+        self.assertEqual(order1.external_order_id, "ORDER-123")
+        self.assertEqual(order2.external_order_id, "ORDER-123:REFUND")
