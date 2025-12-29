@@ -1118,7 +1118,7 @@ class APIController(http.Controller):
                     pos_session.sudo().write({'move_id': False})
 
             # Force the session state to closed
-            pos_session.sudo().write({'state': 'closed'})
+            pos_session.sudo().write({'state': 'closed', 'stop_at': fields.Datetime.now()})
             _logger.info(f"Force closed POS session {session_name}")
 
         except Exception as e:
