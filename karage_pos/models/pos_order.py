@@ -175,6 +175,19 @@ class PosOrder(models.Model):
         # Non-external orders use standard flow
         return super()._process_saved_order(draft)
 
+    def action_pos_order_paid(self):
+        """Override to accept partial payments for external/webhook orders.
+
+        Standard Odoo requires full payment before marking order as paid.
+        For webhook orders, we accept partial payments since the external
+        system handles payment validation.
+        """
+        if self._is_external_order():
+            # For webhook orders, skip payment validation and mark as paid
+            self.write({'state': 'paid'})
+            return True
+        return super().action_pos_order_paid()
+
     def _should_create_picking_real_time(self):
         """Override to force real-time picking for external/webhook orders.
 
@@ -185,3 +198,23 @@ class PosOrder(models.Model):
         if self._is_external_order():
             return True
         return super()._should_create_picking_real_time()
+
+
+class PosOrderLine(models.Model):
+    _inherit = "pos.order.line"
+
+    def _prepare_base_line_for_taxes_computation(self):
+        """Override to use external_order_id as invoice line name.
+
+        When generating invoices for external/webhook orders, use the external
+        order ID as the invoice line description for better traceability.
+        """
+        values = super()._prepare_base_line_for_taxes_computation()
+
+        # Use external_order_id as label if available
+        external_order_id = self.order_id.external_order_id
+        if external_order_id:
+            values['name'] = external_order_id
+            _logger.debug(f"Set invoice line name to external_order_id: {external_order_id}")
+
+        return values
