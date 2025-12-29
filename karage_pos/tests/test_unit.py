@@ -982,11 +982,13 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
         self.assertIn("Invalid OrderStatus", error["message"])
 
     def test_process_pos_order_with_tax(self):
-        """Test order with tax - webhook prices are tax-inclusive"""
-        # Note: Webhook sends final (tax-inclusive) prices
-        # Price in OrderItems is the tax-inclusive unit price
-        # Tax/TaxPercent should be 0 when prices already include tax
-        # (to avoid double-counting in validation)
+        """Test order processing with products that may have taxes"""
+        # Note: PriceWithoutTax is the tax-excluded price
+        # Odoo will compute tax based on product.taxes_id
+        # The total will include any computed taxes
+
+        # Remove any default taxes from the product for predictable test
+        self.product1.taxes_id = [(5, 0, 0)]  # Clear all taxes
 
         data = {
             "OrderID": 8007,
@@ -994,12 +996,12 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
             "AmountPaid": "115.0",
             "AmountTotal": 115.0,
             "GrandTotal": 115.0,
-            "Tax": 0.0,  # 0 because tax is already in Price
-            "TaxPercent": 0.0,  # 0 because prices already include tax
+            "Tax": 0.0,
+            "TaxPercent": 0.0,
             "OrderItems": [{
                 "OdooItemID": self.product1.id,
                 "ItemName": self.product1.name,
-                "PriceWithoutTax": 115.0,  # Tax-inclusive price (base 100 + 15 tax)
+                "PriceWithoutTax": 115.0,  # Tax-excluded unit price
                 "Quantity": 1,
                 "DiscountPercentage": 0.0,
             }],
@@ -1018,7 +1020,7 @@ class TestProcessPosOrder(TransactionCase, KaragePosTestCommon):
 
         self.assertIsNone(error)
         self.assertIsNotNone(pos_order)
-        # Verify order was created with correct tax-inclusive total
+        # Verify order was created with correct total (no tax since product has none)
         self.assertTrue(pos_order.exists())
         self.assertEqual(pos_order.amount_total, 115.0)
 
