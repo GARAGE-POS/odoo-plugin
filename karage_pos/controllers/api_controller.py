@@ -150,6 +150,52 @@ class APIController(http.Controller):
         _logger.warning("API key check failed for all scopes")
         return False, "Invalid or missing API key"
 
+    def _validate_pos_config_id(self, pos_config_id):
+        """
+        Validate pos_config_id is a positive integer and exists in Odoo.
+
+        :param pos_config_id: POS config ID to validate
+        :return: Error message string if invalid, None if valid
+        """
+        # Check it's a valid positive integer
+        try:
+            pos_config_id = int(pos_config_id)
+        except (ValueError, TypeError):
+            return f"pos_config_id must be a valid integer, got: {pos_config_id}"
+
+        if pos_config_id <= 0:
+            return f"pos_config_id must be greater than zero, got: {pos_config_id}"
+
+        # Check it exists in Odoo
+        pos_config = request.env["pos.config"].sudo().browse(pos_config_id)
+        if not pos_config.exists():
+            return f"pos_config_id {pos_config_id} does not exist in Odoo"
+
+        return None
+
+    def _validate_partner_id(self, partner_id):
+        """
+        Validate partner_id is a positive integer and exists in Odoo.
+
+        :param partner_id: Partner ID to validate
+        :return: Error message string if invalid, None if valid
+        """
+        # Check it's a valid positive integer
+        try:
+            partner_id = int(partner_id)
+        except (ValueError, TypeError):
+            return f"partner_id must be a valid integer, got: {partner_id}"
+
+        if partner_id <= 0:
+            return f"partner_id must be greater than zero, got: {partner_id}"
+
+        # Check it exists in Odoo
+        partner = request.env["res.partner"].sudo().browse(partner_id)
+        if not partner.exists():
+            return f"partner_id {partner_id} does not exist in Odoo"
+
+        return None
+
     # ========== Main Endpoint ==========
 
     @http.route(
@@ -264,6 +310,20 @@ class APIController(http.Controller):
                 self._update_log(webhook_log, 400, error_msg, False, start_time=start_time)
                 return self._json_response(None, status=400, error=error_msg)
 
+            # 6b. Validate pos_config_id if provided
+            if pos_config_id is not None:
+                validation_error = self._validate_pos_config_id(pos_config_id)
+                if validation_error:
+                    self._update_log(webhook_log, 400, validation_error, False, start_time=start_time)
+                    return self._json_response(None, status=400, error=validation_error)
+
+            # 6c. Validate top-level partner_id if provided
+            if top_level_partner_id is not None:
+                validation_error = self._validate_partner_id(top_level_partner_id)
+                if validation_error:
+                    self._update_log(webhook_log, 400, validation_error, False, start_time=start_time)
+                    return self._json_response(None, status=400, error=validation_error)
+
             # 7. Check bulk size limit
             max_orders = int(
                 request.env[IR_CONFIG_PARAMETER]
@@ -367,6 +427,18 @@ class APIController(http.Controller):
                             "error": f'Missing required fields: {", ".join(missing_fields)}'
                         })
                         continue
+
+                    # Validate order-level partner_id if provided
+                    order_partner_id = order_data.get("partner_id")
+                    if order_partner_id is not None:
+                        validation_error = self._validate_partner_id(order_partner_id)
+                        if validation_error:
+                            results.append({
+                                "external_order_id": order_id,
+                                "status": "error",
+                                "error": validation_error
+                            })
+                            continue
 
                     # Process the order
                     pos_order, order_error = self._process_pos_order(
