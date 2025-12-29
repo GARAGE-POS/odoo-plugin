@@ -787,9 +787,16 @@ class TestPosOrderLine(TransactionCase, KaragePosTestCommon):
     def setUpClass(cls):
         super().setUpClass()
         cls.setup_common()
+        # Check if _prepare_base_line_for_taxes_computation exists (Odoo 18+ only)
+        cls.has_taxes_computation = hasattr(
+            cls.env['pos.order.line'], '_prepare_base_line_for_taxes_computation'
+        )
 
     def test_prepare_base_line_for_taxes_computation_with_external_id(self):
-        """Test that external_order_id is used as invoice line name."""
+        """Test that external_order_id is used as invoice line name (Odoo 18+)."""
+        if not self.has_taxes_computation:
+            self.skipTest("_prepare_base_line_for_taxes_computation not available in Odoo 17")
+
         pos_order = self.env["pos.order"].create({
             "session_id": self.pos_session.id,
             "config_id": self.pos_config.id,
@@ -824,7 +831,10 @@ class TestPosOrderLine(TransactionCase, KaragePosTestCommon):
         self.assertEqual(values.get('name'), "EXT-LINE-TEST-123")
 
     def test_prepare_base_line_for_taxes_computation_without_external_id(self):
-        """Test that standard name is used when no external_order_id."""
+        """Test that standard name is used when no external_order_id (Odoo 18+)."""
+        if not self.has_taxes_computation:
+            self.skipTest("_prepare_base_line_for_taxes_computation not available in Odoo 17")
+
         pos_order = self.env["pos.order"].create({
             "session_id": self.pos_session.id,
             "config_id": self.pos_config.id,

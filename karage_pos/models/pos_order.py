@@ -208,8 +208,17 @@ class PosOrderLine(models.Model):
 
         When generating invoices for external/webhook orders, use the external
         order ID as the invoice line description for better traceability.
+
+        Note: This method only exists in Odoo 18+. In Odoo 17, this override
+        will not be called since the parent method doesn't exist.
         """
-        values = super()._prepare_base_line_for_taxes_computation()
+        # Check if parent has this method (Odoo 18+ only)
+        parent_method = getattr(super(), '_prepare_base_line_for_taxes_computation', None)
+        if parent_method is None:
+            # Odoo 17 doesn't have this method, return empty dict
+            return {}
+
+        values = parent_method()
 
         # Use external_order_id as label if available
         external_order_id = self.order_id.external_order_id
