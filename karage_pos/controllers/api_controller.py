@@ -525,28 +525,19 @@ class APIController(http.Controller):
         return None
 
     def _validate_order_status(self, order_status):
-        """Validate order status against configured valid statuses
-
-        Default valid statuses:
-        - 103: Regular orders
-        - 106: Refund orders
-        """
+        """Validate order status: 103 (Regular) or 106 (Refund)"""
         if order_status is None:
             return None
 
-        valid_statuses_str = request.env[IR_CONFIG_PARAMETER].sudo().get_param(
-            "karage_pos.valid_order_statuses", "103,106"
-        )
-        valid_statuses = [
-            int(s.strip()) for s in valid_statuses_str.split(",") if s.strip().isdigit()
-        ]
+        # Hardcoded valid statuses
+        valid_statuses = [103, 106]
 
         if order_status not in valid_statuses:
             return {
                 "status": 400,
                 "message": (
                     f"Invalid OrderStatus: {order_status}. "
-                    f"Only completed orders ({', '.join(map(str, valid_statuses))}) are accepted."
+                    f"Only completed orders (103, 106) are accepted."
                 )
             }
         return None

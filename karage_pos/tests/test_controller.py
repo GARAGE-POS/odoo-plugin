@@ -504,15 +504,10 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         self.assertIn("9002", result2["data"]["results"][0]["error"])
 
     def test_webhook_order_status_validation(self):
-        """Test OrderStatus validation with configured allowed statuses"""
-        # Set valid statuses to only 103
-        self.env["ir.config_parameter"].sudo().set_param(
-            "karage_pos.valid_order_statuses", "103"
-        )
-
+        """Test OrderStatus validation with hardcoded allowed statuses"""
         data = self.sample_webhook_data.copy()
         data["OrderID"] = 9003
-        data["OrderStatus"] = 104  # Invalid status
+        data["OrderStatus"] = 104  # Invalid status (not 103 or 106)
         data["OrderDate"] = "2025-11-27T10:00:00"
         data["OrderItems"][0]["ItemID"] = self.product1.id
 
@@ -521,19 +516,27 @@ class TestWebhookController(HttpCase, KaragePosTestCommon):
         result = json.loads(response.content)
         self.assertEqual(result["data"]["failed"], 1)
         self.assertIn("Invalid OrderStatus", result["data"]["results"][0]["error"])
+        self.assertIn("103, 106", result["data"]["results"][0]["error"])
 
-    def test_webhook_order_status_validation_multiple(self):
-        """Test OrderStatus validation with multiple allowed statuses"""
-        # Set valid statuses to 103 and 104
-        self.env["ir.config_parameter"].sudo().set_param(
-            "karage_pos.valid_order_statuses", "103,104"
-        )
-
+    def test_webhook_order_status_validation_valid_statuses(self):
+        """Test OrderStatus validation accepts valid statuses 103 and 106"""
+        # Test with status 103 (Regular order)
         data = self.sample_webhook_data.copy()
         data["OrderID"] = 9004
-        data["OrderStatus"] = 104  # Now valid
+        data["OrderStatus"] = 103  # Valid status
         data["OrderDate"] = "2025-11-27T10:00:00"
         data["OrderItems"][0]["ItemID"] = self.product1.id
+
+        response = self._make_webhook_request(data)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)
+        self.assertEqual(result["data"]["successful"], 1)
+
+        # Test with status 106 (Refund order)
+        data["OrderID"] = 9004001  # Different order ID
+        data["OrderStatus"] = 106  # Valid refund status
+        data["OrderItems"][0]["Quantity"] = -1  # Negative for refund
+        data["CheckoutDetails"][0]["AmountPaid"] = -100.0  # Negative for refund
 
         response = self._make_webhook_request(data)
         self.assertEqual(response.status_code, 200)
