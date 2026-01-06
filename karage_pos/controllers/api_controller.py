@@ -530,6 +530,8 @@ class APIController(http.Controller):
             return None
 
         # Hardcoded valid statuses
+        # 103: Regular orders
+        # 106: Refund orders
         valid_statuses = [103, 106]
 
         if order_status not in valid_statuses:
