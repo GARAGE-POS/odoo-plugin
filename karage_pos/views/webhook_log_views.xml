@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_webhook_log_list" model="ir.ui.view">
+        <field name="name">karage.pos.webhook.log.list</field>
+        <field name="model">karage.pos.webhook.log</field>
+        <field name="arch" type="xml">
+            <tree string="Webhook Logs" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'processing'" decoration-muted="status == 'pending'">
+                <field name="receive_date"/>
+                <field name="order_id"/>
+                <field name="status"/>
+                <field name="pos_order_id"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_webhook_log_form" model="ir.ui.view">
+        <field name="name">karage.pos.webhook.log.form</field>
+        <field name="model">karage.pos.webhook.log</field>
+        <field name="arch" type="xml">
+            <form string="Webhook Log" edit="false" create="false" delete="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="receive_date" readonly="1"/>
+                            <field name="order_id"/>
+                            <field name="status"/>
+                        </group>
+                        <group>
+                            <field name="status_code"/>
+                            <field name="processing_time"/>
+                            <field name="pos_order_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Webhook Body" name="webhook_body">
+                            <field name="webhook_body" readonly="1" nolabel="1" widget="text"/>
+                        </page>
+                        <page string="Response" name="response">
+                            <field name="response_message" readonly="1" nolabel="1" widget="text"/>
+                        </page>
+                        <page string="Error Details" name="error" invisible="not error_message">
+                            <field name="error_message" readonly="1" nolabel="1" widget="text"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_webhook_log_search" model="ir.ui.view">
+        <field name="name">karage.pos.webhook.log.search</field>
+        <field name="model">karage.pos.webhook.log</field>
+        <field name="arch" type="xml">
+            <search string="Webhook Logs">
+                <field name="order_id"/>
+                <field name="pos_order_id"/>
+                <filter string="Pending" name="pending" domain="[('status', '=', 'pending')]"/>
+                <filter string="Processing" name="processing" domain="[('status', '=', 'processing')]"/>
+                <filter string="Completed" name="completed" domain="[('status', '=', 'completed')]"/>
+                <filter string="Failed" name="failed" domain="[('status', '=', 'failed')]"/>
+                <filter string="Today" name="today" domain="[('receive_date', '>=', datetime.datetime.now().replace(hour=0, minute=0, second=0))]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Status" name="group_by_status" context="{'group_by': 'status'}"/>
+                    <filter string="Receive Date" name="group_by_receive_date" context="{'group_by': 'receive_date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_webhook_log" model="ir.actions.act_window">
+        <field name="name">Webhook Logs</field>
+        <field name="res_model">karage.pos.webhook.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_webhook_log_search"/>
+        <field name="context">{'create': False, 'delete': False, 'edit': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No webhook logs yet
+            </p>
+            <p>
+                All incoming webhook requests are logged automatically. Logs are read-only.
+            </p>
+        </field>
+    </record>
+
+    <!-- Main menu for Karage POS -->
+    <menuitem id="menu_karage_pos_root"
+              name="Karage POS"
+              sequence="50"
+              web_icon="karage_pos,static/description/icon.png"
+              action="action_webhook_log"/>
+</odoo>
