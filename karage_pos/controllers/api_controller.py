@@ -349,10 +349,14 @@ class APIController(http.Controller):
                 default_customer_ref=top_level_customer_ref,
             )
 
-            # 9. Close and post the POS session
-            pos_session = self._get_current_external_session(pos_config_id=pos_config_id)
-            if pos_session:
-                self._close_and_post_session(pos_session)
+            # 9. Close and post the POS session — use savepoint so failure doesn't rollback orders
+            try:
+                with request.env.cr.savepoint():
+                    pos_session = self._get_current_external_session(pos_config_id=pos_config_id)
+                    if pos_session:
+                        self._close_and_post_session(pos_session)
+            except Exception as e:
+                _logger.warning(f"Session close failed (will be auto-closed by cron): {e}")
 
             # 10. Determine overall status
             total = len(results)
@@ -1114,13 +1118,19 @@ class APIController(http.Controller):
         """
         from odoo import SUPERUSER_ID
 
-        if not pos_session or pos_session.state == 'closed':
+        if not pos_session:
             return
 
-        session_name = pos_session.name
-        original_state = pos_session.state
-
         try:
+            if not pos_session.exists():
+                _logger.warning("POS session no longer exists, skipping close")
+                return
+            if pos_session.state == 'closed':
+                return
+
+            session_name = pos_session.name
+            original_state = pos_session.state
+
             # Use SUPERUSER_ID and context flags to bypass custom permission restrictions
             # Many custom modules (like accounting_access) check these context flags
             bypass_context = {
@@ -1154,11 +1164,11 @@ class APIController(http.Controller):
         except Exception as e:
             # Standard close failed (e.g., due to custom permission modules like accounting_access)
             # Fall back to force-closing the session
-            _logger.warning(
-                f"Standard session close failed for {session_name}: {e}. "
-                "Attempting force close..."
-            )
-            self._force_close_session(pos_session)
+            _logger.warning(f"Standard session close failed: {e}. Attempting force close...")
+            try:
+                self._force_close_session(pos_session)
+            except Exception as force_err:
+                _logger.error(f"Force close also failed: {force_err}")
 
     def _force_close_session(self, pos_session):
         """
