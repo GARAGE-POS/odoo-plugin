@@ -356,7 +356,7 @@ class APIController(http.Controller):
                     if pos_session:
                         self._close_and_post_session(pos_session)
             except Exception as e:
-                _logger.warning(f"Session close failed (will be auto-closed by cron): {e}")
+                _logger.warning("Session close failed (will be auto-closed by cron): %s", e)
 
             # 10. Determine overall status
             total = len(results)
@@ -1164,11 +1164,11 @@ class APIController(http.Controller):
         except Exception as e:
             # Standard close failed (e.g., due to custom permission modules like accounting_access)
             # Fall back to force-closing the session
-            _logger.warning(f"Standard session close failed: {e}. Attempting force close...")
+            _logger.warning("Standard session close failed: %s. Attempting force close...", e)
             try:
                 self._force_close_session(pos_session)
             except Exception as force_err:
-                _logger.error(f"Force close also failed: {force_err}")
+                _logger.error("Force close also failed: %s", force_err)
 
     def _force_close_session(self, pos_session):
         """
